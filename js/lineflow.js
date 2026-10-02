@@ -35,6 +35,38 @@
   /* the sheet's floor words -> one id ("S.Level", "Street level", "1st", "First") */
   /* one rule for the sheet's floor word, shared with the offer PDF */
   function floorId(raw) { return MM.inventory.floorId(raw); }
+  /* ---- sending a file from a phone (build 88; Qomor's proven pieces) ----
+     Ask "is this a phone?", not "can the browser share?": Chrome on a Windows
+     laptop answers yes to canShare and then opens a flyout that never settles,
+     leaving a dead button (playbook 01, 4). userAgentData is definitive where
+     it exists; (pointer: coarse) covers the iPhone, which has none. */
+  function handheld() {
+    try {
+      if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean') return navigator.userAgentData.mobile;
+      return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    } catch (e) { return false; }
+  }
+  function canShare(payload) {
+    try { return typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare(payload); }
+    catch (e) { return false; }
+  }
+  /* navigator.share, but it always settles: a promise that never resolves is
+     an error nowhere, so give it a minute and then call it one */
+  function shareOrTimeOut(payload) {
+    return Promise.race([
+      navigator.share(payload),
+      new Promise(function (ok, no) {
+        setTimeout(function () { var e = new Error('share timed out'); e.name = 'TimeoutError'; no(e); }, 60000);
+      })
+    ]);
+  }
+  function saveFile(file) {
+    var url = URL.createObjectURL(file), a = document.createElement('a');
+    a.href = url; a.download = file.name; a.style.display = 'none';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); if (a.parentNode) a.parentNode.removeChild(a); }, 30000);
+  }
+
   /* the demo page around the app (demo.html), if there is one */
   function demoPhone() {
     try { var d = root.parent !== root && root.parent.MMDemo; return d && typeof d.share === 'function' ? d : null; }
@@ -845,30 +877,62 @@
          a popup opened later is blocked silently (playbook 01, 4b) */
       send.addEventListener('click', function () {
         if (!current) return;
+        var c = current, demo = demoPhone();
+        var withPdf = !!(MM.offerPdf && MM.offerPdf.can(p, c.u));
+        function makePdf() {
+          return MM.offerPdf.make({ project: p, unit: c.u, plan: c.pl, buildingName: c.b && c.b.name, buildingRows: c.b && c.b.rows });
+        }
+        /* build 88, THE REAL PHONE does what the demo shows: the offer PDF goes
+           into WhatsApp through the phone's own share sheet. The PDF is built
+           NOW, while the question below is answered, because an iPhone refuses
+           to open the share sheet once the tap has waited for anything; so the
+           Continue tap must find it ready (playbook 01: "Build the share file
+           when the panel opens"). */
+        var made = null, ready = null;
+        if (!demo && withPdf) ready = makePdf().then(function (r) { made = r; return r; });
         /* build 84: first, WHO IS IT FOR (developer playbook §13; promised in
            the quotation): a broker's special request, counted for that
            company, or a general broadcast. Then it goes. */
         askAudience(function (who) {
-          /* build 83: inside the demo's phone (demo.html), the PHONE answers:
-             its share sheet slides up, a WhatsApp chat is chosen and the offer
-             PDF goes with the text. Only there; a real phone still goes
-             straight to WhatsApp with the text, as before. */
-          var demo = demoPhone();
+          /* build 83: inside the demo's phone (demo.html), the demo's own
+             phone screens answer: its share sheet, the chat, the PDF. */
           if (demo) {
-            var c = current;
             demo.share({
               text: offerText(), agent: session.name || '', unit: c.u.code,
               audience: who.audience, company: who.company,
-              pdf: MM.offerPdf && MM.offerPdf.can(p, c.u) ? function () {
-                return MM.offerPdf.make({ project: p, unit: c.u, plan: c.pl, buildingName: c.b && c.b.name, buildingRows: c.b && c.b.rows });
-              } : null
+              pdf: withPdf ? makePdf : null
             });
             return;
           }
-          /* still inside the Continue tap, so the window is not blocked */
-          window.open('https://wa.me/?text=' + encodeURIComponent(offerText()), '_blank', 'noopener');
-        });
+          deliver(made, offerText());       /* still inside the Continue tap */
+        }, { ready: ready });
       });
+      /* the offer leaves the app. A phone: the PDF (and the text) through its
+         share sheet. A laptop: WhatsApp Web with the text, and the PDF saved to
+         attach, because a laptop's share flyout can hang for ever (playbook 01,
+         4) and wa.me cannot carry a file (5). No PDF for this unit: the text. */
+      function deliver(made, text) {
+        var file = null;
+        try { if (made) file = new File([made.blob], made.name, { type: 'application/pdf' }); } catch (e) { file = null; }
+        /* copy the text FIRST: once the share sheet is open the page has lost
+           focus and the clipboard refuses; WhatsApp on an iPhone often drops
+           the text that travels with a file */
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(function () {});
+        if (file && handheld() && canShare({ files: [file] })) {
+          var payload = canShare({ files: [file], text: text }) ? { files: [file], text: text } : { files: [file] };
+          note.textContent = '';
+          shareOrTimeOut(payload).then(function () {
+            note.textContent = t('Offer PDF shared. The text is copied too, in case WhatsApp drops it.');
+          }, function (e) {
+            if (e && e.name === 'AbortError') return;          /* the agent closed the sheet: a decision, not a failure */
+            saveFile(file);
+            note.textContent = t('Could not open the share sheet, so the PDF was saved. The text is copied.');
+          });
+          return;
+        }
+        window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+        if (file) { saveFile(file); note.textContent = t('WhatsApp opened with the text. The offer PDF is downloaded: attach it there.'); }
+      }
       copy.addEventListener('click', function () {
         if (!current) return;
         var txt = offerText();
@@ -902,7 +966,9 @@
        phone passes the company the request came from. Recorded nowhere yet:
        the activity log is the back end's job. */
     var AUD_KEY = 'mm.audience';
-    function askAudience(then) {
+    /* how.ready (build 88): the offer PDF being made for a real phone; Continue
+       waits for it, so the share sheet can open inside that tap */
+    function askAudience(then, how) {
       var last = null;
       try { last = JSON.parse(sessionStorage.getItem(AUD_KEY) || 'null'); } catch (e) { last = null; }
       var demo = demoPhone(), asked = demo && demo.request && demo.request.company;
@@ -950,7 +1016,10 @@
       var hi = -1;
       function matches() {
         var s = inp.value.trim().toLowerCase();
-        return names.filter(function (n) { return !s || n.toLowerCase().indexOf(s) !== -1; });
+        if (!s) return names;
+        /* the companies that START with what was typed first, then the rest that contain it */
+        var starts = names.filter(function (n) { return n.toLowerCase().indexOf(s) === 0; });
+        return starts.concat(names.filter(function (n) { return n.toLowerCase().indexOf(s) > 0; }));
       }
       function paintDrop(open) {
         var m = matches();
@@ -986,6 +1055,15 @@
       var acts = el('div', 'q-who-acts');
       var cancel = el('button', 'q-ghost', t('Cancel')); cancel.type = 'button';
       var go2 = el('button', 'q-cta', t('Continue to WhatsApp')); go2.type = 'button';
+      var pending = !!(how && how.ready);
+      if (pending) {
+        go2.textContent = t('Preparing the offer PDF…');
+        how.ready.then(function () { pending = false; go2.textContent = t('Continue to WhatsApp'); check(); },
+          function () {
+            pending = false; go2.textContent = t('Continue to WhatsApp'); check();
+            card.insertBefore(el('p', 'q-who-note', t('The offer PDF could not be made, so the text goes alone.')), acts);
+          });
+      }
       acts.appendChild(cancel); acts.appendChild(go2);
       card.appendChild(acts);
       box.appendChild(dim); box.appendChild(card);
@@ -998,7 +1076,7 @@
         if (a === 'broker' && !inp.value && !asked) inp.value = (last && last.audience === 'broker' && last.company) || '';
         check();
       }
-      function check() { go2.disabled = !audience || (audience === 'broker' && !inp.value.trim()); }
+      function check() { go2.disabled = pending || !audience || (audience === 'broker' && !inp.value.trim()); }
       inp.addEventListener('input', check);
       function close() {
         box.classList.remove('in');
