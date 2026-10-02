@@ -2752,6 +2752,28 @@ body.is-ready .mv-hint { opacity: 1; }
 .q-cta:disabled { opacity: .5; cursor: default; }
 .q-cta:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
 .q-note { font-size: 12.5px; color: var(--q-dim); }
+/* build 84: who is this offer for, asked before every offer leaves the app */
+.q.q-who { position: fixed; inset: 0; z-index: 60; padding: 0; display: flex; align-items: flex-end; justify-content: center; }
+.q-who-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .6); opacity: 0; transition: opacity .25s ease; }
+.q-who-card { position: relative; width: 100%; max-width: 520px; padding: 22px 18px 26px; border-radius: 18px 18px 0 0;
+  background: #111; border: 1px solid var(--q-edge); border-bottom: 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, .5);
+  transform: translateY(100%); transition: transform .32s cubic-bezier(.32, .72, 0, 1); }
+.q-who.in .q-who-dim { opacity: 1; }
+.q-who.in .q-who-card { transform: none; }
+.q-who-card h3 { margin: 4px 0 14px; font-size: 20px; font-weight: 600; letter-spacing: -.01em; color: var(--white); }
+.q-who-opts { display: grid; gap: 10px; }
+.q-who-opt { display: block; width: 100%; text-align: start; font: inherit; color: var(--white); cursor: pointer;
+  padding: 14px 16px; border-radius: 14px; background: var(--q-glass); border: 1px solid var(--q-edge); }
+.q-who-opt b { display: block; font-size: 15px; font-weight: 700; }
+.q-who-opt span { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: var(--q-dim); }
+.q-who-opt[aria-pressed="true"] { border-color: var(--orange); box-shadow: inset 0 0 0 1px var(--orange);
+  background: color-mix(in srgb, var(--orange) 10%, transparent); }
+.q-who-opt:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+.q-who-co { display: grid; gap: 7px; margin-top: 14px; }
+.q-who-co[hidden] { display: none; }
+.q-who-in { width: 100%; font-size: 15px; }
+.q-who-note { font-size: 12px; line-height: 1.45; color: var(--q-faint); }
+.q-who-acts { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px; }
 .q-assume { margin: 18px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.55; color: var(--q-faint); }
 .q-empty { margin-top: 14px; font-size: 13.5px; color: var(--q-dim); }
 .q-src { margin-top: 26px; }

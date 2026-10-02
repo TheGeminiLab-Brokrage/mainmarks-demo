@@ -845,22 +845,29 @@
          a popup opened later is blocked silently (playbook 01, 4b) */
       send.addEventListener('click', function () {
         if (!current) return;
-        /* build 83: inside the demo's phone (demo.html), the PHONE answers:
-           its share sheet slides up, a WhatsApp chat is chosen and the offer
-           PDF goes with the text. Only there; a real phone still goes
-           straight to WhatsApp with the text, as before. */
-        var demo = demoPhone();
-        if (demo) {
-          var c = current;
-          demo.share({
-            text: offerText(), agent: session.name || '', unit: c.u.code,
-            pdf: MM.offerPdf && MM.offerPdf.can(p, c.u) ? function () {
-              return MM.offerPdf.make({ project: p, unit: c.u, plan: c.pl, buildingName: c.b && c.b.name, buildingRows: c.b && c.b.rows });
-            } : null
-          });
-          return;
-        }
-        window.open('https://wa.me/?text=' + encodeURIComponent(offerText()), '_blank', 'noopener');
+        /* build 84: first, WHO IS IT FOR (developer playbook §13; promised in
+           the quotation): a broker's special request, counted for that
+           company, or a general broadcast. Then it goes. */
+        askAudience(function (who) {
+          /* build 83: inside the demo's phone (demo.html), the PHONE answers:
+             its share sheet slides up, a WhatsApp chat is chosen and the offer
+             PDF goes with the text. Only there; a real phone still goes
+             straight to WhatsApp with the text, as before. */
+          var demo = demoPhone();
+          if (demo) {
+            var c = current;
+            demo.share({
+              text: offerText(), agent: session.name || '', unit: c.u.code,
+              audience: who.audience, company: who.company,
+              pdf: MM.offerPdf && MM.offerPdf.can(p, c.u) ? function () {
+                return MM.offerPdf.make({ project: p, unit: c.u, plan: c.pl, buildingName: c.b && c.b.name, buildingRows: c.b && c.b.rows });
+              } : null
+            });
+            return;
+          }
+          /* still inside the Continue tap, so the window is not blocked */
+          window.open('https://wa.me/?text=' + encodeURIComponent(offerText()), '_blank', 'noopener');
+        });
       });
       copy.addEventListener('click', function () {
         if (!current) return;
@@ -882,6 +889,97 @@
        table, which scrolls inside itself with its header pinned. (Build 81
        split it into two cards, each with its own header: it read as two
        tables.) A plan of 3 years or less (or cash) never scrolls. */
+    /* ---- WHO IS THIS OFFER FOR (build 84) --------------------------
+       Asked before every offer leaves the app (developer playbook §13,
+       "the question before every offer"; the quotation: "each offer is
+       tagged to a brokerage company or marked as general marketing"):
+         Special request   a broker asked: the company is named, so the
+                           manager's view can count it against them
+         General broadcast groups, channels, status: no single company
+       The last answer is remembered for the visit (ten offers to one
+       company are not ten questions). Main Marks has not sent its brokerage
+       list yet, so the company is typed, and the card says so; the demo's
+       phone passes the company the request came from. Recorded nowhere yet:
+       the activity log is the back end's job. */
+    var AUD_KEY = 'mm.audience';
+    function askAudience(then) {
+      var last = null;
+      try { last = JSON.parse(sessionStorage.getItem(AUD_KEY) || 'null'); } catch (e) { last = null; }
+      var demo = demoPhone(), asked = demo && demo.request && demo.request.company;
+      var list = (p.brokerages || []).map(function (b) { return typeof b === 'string' ? b : b.name; }).filter(Boolean);
+
+      var box = el('div', 'q q-who');
+      box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-labelledby', 'qWhoH');
+      var dim = el('div', 'q-who-dim');
+      var card = el('div', 'q-who-card');
+      card.appendChild(el('p', 'q-k', t('Before you send')));
+      var h = el('h3', null, t('Who is this offer for?')); h.id = 'qWhoH';
+      card.appendChild(h);
+      var opts = el('div', 'q-who-opts');
+      function opt(a, title, sub) {
+        var b = el('button', 'q-who-opt'); b.type = 'button'; b.dataset.a = a;
+        b.setAttribute('aria-pressed', 'false');
+        b.appendChild(el('b', null, t(title))); b.appendChild(el('span', null, t(sub)));
+        b.addEventListener('click', function () { choose(a); });
+        opts.appendChild(b);
+        return b;
+      }
+      opt('broker', 'Special request', 'A broker asked for it. Counted for their company.');
+      opt('broadcast', 'General broadcast', 'Groups, channels, status. No single company.');
+      card.appendChild(opts);
+
+      var co = el('label', 'q-who-co'); co.hidden = true;
+      co.appendChild(el('span', 'q-k', t('Which company asked?')));
+      var inp = el('input', 'q-select q-who-in');
+      inp.type = 'text'; inp.placeholder = t('Brokerage company'); inp.autocomplete = 'off';
+      if (list.length) {
+        var dl = el('datalist'); dl.id = 'qWhoList';
+        list.forEach(function (n) { var o2 = el('option'); o2.value = n; dl.appendChild(o2); });
+        co.appendChild(dl); inp.setAttribute('list', 'qWhoList');
+      }
+      co.appendChild(inp);
+      if (!list.length) co.appendChild(el('span', 'q-who-note', t('Main Marks’ brokerage list will fill this once it is sent. Type the company for now.')));
+      card.appendChild(co);
+
+      var acts = el('div', 'q-who-acts');
+      var cancel = el('button', 'q-ghost', t('Cancel')); cancel.type = 'button';
+      var go2 = el('button', 'q-cta', t('Continue to WhatsApp')); go2.type = 'button';
+      acts.appendChild(cancel); acts.appendChild(go2);
+      card.appendChild(acts);
+      box.appendChild(dim); box.appendChild(card);
+
+      var audience = null;
+      function choose(a) {
+        audience = a;
+        [].forEach.call(opts.children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.a === a)); });
+        co.hidden = a !== 'broker';
+        if (a === 'broker' && !inp.value) inp.value = asked || (last && last.audience === 'broker' && last.company) || '';
+        check();
+      }
+      function check() { go2.disabled = !audience || (audience === 'broker' && !inp.value.trim()); }
+      inp.addEventListener('input', check);
+      function close() {
+        box.classList.remove('in');
+        setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 300);
+        document.removeEventListener('keydown', onKey);
+      }
+      function onKey(e) { if (e.key === 'Escape') close(); }
+      cancel.addEventListener('click', close);
+      dim.addEventListener('click', close);
+      document.addEventListener('keydown', onKey);
+      go2.addEventListener('click', function () {
+        var who = { audience: audience, company: audience === 'broker' ? inp.value.trim() : null };
+        try { sessionStorage.setItem(AUD_KEY, JSON.stringify(who)); } catch (e) {}
+        close();
+        then(who);
+      });
+
+      if (last && !asked) choose(last.audience); else check();
+      document.body.appendChild(box);
+      void box.offsetWidth;
+      box.classList.add('in');
+    }
+
     var FIRST_YEARS = 3;
     function table(s) {
       var wrap = el('div', 'q-sched-wrap');

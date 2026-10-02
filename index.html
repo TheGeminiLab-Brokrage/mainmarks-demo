@@ -171,6 +171,26 @@
     background: none; border: 0; color: #fff; font: inherit; font-size: 16px; cursor: pointer; text-align: left; }
   .sh-acts button + button { border-top: .5px solid #3a3a3c; }
   .sh-acts button span { color: #c7c7cc; font-size: 17px; }
+  /* ---- WATCH IT (build 84): the demo plays itself, a tap mark at every touch ---- */
+  .btn-watch { background: #25D366; border-color: #25D366; color: #04160b; }
+  .btn-watch:hover { border-color: #5ee08f; background: #3ddc79; }
+  .btn-watch[aria-pressed="true"] { background: rgba(255, 255, 255, .06); border-color: var(--edge); color: var(--white); }
+  .watch-pill { display: none; position: absolute; left: 50%; bottom: 74px; transform: translateX(-50%); z-index: 3;
+    padding: 9px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
+    color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .shield { position: absolute; inset: 0; z-index: 6; cursor: pointer; }
+  .shield[hidden] { display: none; }
+  .tap { position: absolute; z-index: 7; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+    pointer-events: none; opacity: 0; background: rgba(255, 255, 255, .32); box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 4px 18px rgba(0, 0, 0, .45); }
+  .tap.on { animation: tapIn .9s ease-out forwards; }
+  @keyframes tapIn {
+    0% { opacity: 0; transform: scale(1.5); }
+    25% { opacity: 1; transform: scale(1); }
+    45% { transform: scale(.82); }
+    70% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.25); }
+  }
+
   /* a phone has no scrollbars (the app's frame hides its own the same way) */
   .os .pages, .os .chat, .os .sh-body, .os .wa-list { scrollbar-width: none; }
   .os .pages::-webkit-scrollbar, .os .chat::-webkit-scrollbar, .os .sh-body::-webkit-scrollbar,
@@ -252,6 +272,7 @@
     .phone::before, .phone::after, .status, .island, .home { display: none; }
     .screen { border-radius: 0; }
     .lock { padding-top: 70px; }
+    .watch-pill { display: block; }          /* the side panel, with its Watch it button, is hidden here */
     .note { top: 270px; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -269,7 +290,7 @@
   <p>This is the real app, running inside the phone. A broker has just sent a request. Tap the message, then answer it from the app: choose Moray, open Wellness, find the unit, open its payment plan, and send the offer back on WhatsApp.</p>
   <div class="req" id="req" hidden>
     <span>The request</span>
-    Sara Adel, broker: a cardiologist wants the lowest-priced clinic at Moray Wellness, on the first floor only (his patients have heart problems).
+    Sara Sales Nawy, a broker at Nawy: a cardiologist wants the lowest-priced clinic at Moray Wellness, on the first floor only (his patients have heart problems).
   </div>
   <div class="creds">
     <span>Demo sign-in</span><br>
@@ -277,6 +298,7 @@
     Password <b>1111</b>
   </div>
   <div class="btns">
+    <button class="btn btn-watch" type="button" id="watch" aria-pressed="false"><span class="wi" aria-hidden="true">▶</span> <span class="wl">Watch it</span></button>
     <button class="btn" type="button" id="restart">Start again</button>
     <button class="btn" type="button" id="moray">Go to Moray</button>
   </div>
@@ -300,12 +322,12 @@
         <svg class="lk" viewBox="0 0 14 18" fill="none" stroke="#fff" stroke-width="1.8" aria-hidden="true"><rect x="1" y="8" width="12" height="9" rx="2.2" fill="#fff" stroke="none"/><path d="M3.6 8V5.4a3.4 3.4 0 0 1 6.8 0V8"/></svg>
         <div class="date" id="date">Thursday 1 October</div>
         <div class="time">9:41</div>
-        <button class="note" id="note" type="button" aria-label="New WhatsApp message from Sara Adel, broker. Open it.">
+        <button class="note" id="note" type="button" aria-label="New WhatsApp message from Sara Sales Nawy. Open it.">
           <span class="ic" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.8l4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm0 2a7.8 7.8 0 1 1-4 14.5l-.3-.2-2.8.8.8-2.7-.2-.3A7.8 7.8 0 0 1 12 4.2Z"/></svg>
           </span>
           <span class="tx">
-            <span class="hd">Sara Adel · Broker <span>now</span></span>
+            <span class="hd">Sara Sales Nawy <span>now</span></span>
             <span class="bd" style="display:block">Hi! My client is a cardiologist. His patients usually have heart problems, so he won’t accept anything higher than the first floor. What’s your lowest-priced first-floor clinic at Moray Wellness?</span>
           </span>
         </button>
@@ -314,6 +336,7 @@
           <img class="wm" src="img/mainmarks-wordmark.svg" alt="">
         </div>
         <div class="hint">Tap the message to answer it</div>
+        <button class="watch-pill" type="button" id="watch2">▶ Watch it play</button>
       </div>
 
       <!-- the phone's own screens (build 83): share sheet -> WhatsApp -->
@@ -363,6 +386,9 @@
         </section>
         <div class="toast" id="toast"></div>
       </div>
+      <!-- Watch it (build 84): the tap mark, and a shield that hands control back on a tap -->
+      <div class="shield" id="shield" hidden></div>
+      <div class="tap" id="tap" aria-hidden="true"></div>
       <div class="home" aria-hidden="true"></div>
     </div>
   </div>
@@ -445,13 +471,13 @@
      WhatsApp" calls MMDemo.share({ text, agent, unit, pdf }) from inside
      the frame; `pdf` makes the real offer PDF (js/offerpdf.js -> js/pdf.js)
      or is null for a unit the offer does not cover yet (then the text goes
-     alone). The contacts are invented, like Sara Adel.
+     alone). The other contacts are invented. The broker is saved as "Sara Sales Nawy", the way a salesperson saves a broker (name, role, company).
      ================================================================== */
   function $(id) { return document.getElementById(id); }
   var os = $('os');
   var REQUEST = document.querySelector('#note .bd').textContent;
   var PEOPLE = [
-    { name: 'Sara Adel', sub: 'Broker', bg: '#7b5ea7', asked: true },
+    { name: 'Sara Sales Nawy', ini: 'SN', sub: 'Nawy', bg: '#7b5ea7', asked: true },
     { name: 'Omar Fathy', sub: 'Broker', bg: '#2f7d6d' },
     { name: 'Moray Sales', sub: 'Team group', bg: '#b5651d' },
     { name: 'Yasmin Nabil', sub: 'Broker', bg: '#3b6fb6' }
@@ -465,7 +491,7 @@
   /* WhatsApp's own formatting: *bold*, line breaks */
   function waText(s) { return esc(s).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/\n/g, '<br>'); }
   function initials(n) { return n.split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase(); }
-  function avatar(el, who) { el.textContent = initials(who.name); el.style.background = who.bg; }
+  function avatar(el, who) { el.textContent = (who.ini || initials(who.name)); el.style.background = who.bg; }
   function mb(bytes) { return bytes > 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' kB'; }
   var toastT = null;
   function toast(msg) {
@@ -549,7 +575,8 @@
     void os.offsetWidth;
     os.classList.add('up');
   }
-  window.MMDemo = { share: share };
+  /* what the request on the lock screen was, so the app's "who is it for" can name the company */
+  window.MMDemo = { share: share, request: { from: 'Sara Sales Nawy', company: 'Nawy' } };
 
   function slide(id, on) { $(id).classList.toggle('in', on); }
   function sheetDown(down) { $('sheet').style.transform = down ? 'translateY(100%)' : ''; }
@@ -642,7 +669,7 @@
     var b = document.createElement('button');
     b.type = 'button'; b.className = 'who' + (who.asked ? ' asked' : '');
     b.setAttribute('aria-label', 'WhatsApp ' + who.name + ', ' + who.sub);
-    b.innerHTML = '<span class="av">' + initials(who.name) + '<i>' + WA_ICON + '</i></span><span class="nm">' + esc(who.name) + '<small>' + esc(who.sub) + '</small></span>';
+    b.innerHTML = '<span class="av">' + (who.ini || initials(who.name)) + '<i>' + WA_ICON + '</i></span><span class="nm">' + esc(who.name) + '<small>' + esc(who.sub) + '</small></span>';
     b.querySelector('.av').style.background = who.bg;
     b.addEventListener('click', function () { pick(who); });
     $('shPeople').appendChild(b);
@@ -664,7 +691,7 @@
     list.innerHTML = '<h6>Frequently contacted</h6>';
     PEOPLE.forEach(function (who) {
       var b = document.createElement('button'); b.type = 'button';
-      b.innerHTML = '<span class="av">' + initials(who.name) + '</span><div><b>' + esc(who.name) + '</b><span>' + esc(who.sub) + '</span></div>';
+      b.innerHTML = '<span class="av">' + (who.ini || initials(who.name)) + '</span><div><b>' + esc(who.name) + '</b><span>' + esc(who.sub) + '</span></div>';
       b.querySelector('.av').style.background = who.bg;
       b.addEventListener('click', function () { pick(who); });
       list.appendChild(b);
@@ -690,6 +717,192 @@
       else closeAll();                                       /* chat: back to the app */
     });
   });
+
+  /* ==================================================================
+     WATCH IT (build 84). The whole story plays by itself, about a minute
+     and a half: the broker's message, sign-in, Moray, Wellness, Find a
+     unit -> 1st floor -> the cheapest match, the drawing, the payment
+     plan, Send offer on WhatsApp -> Sara Sales Nawy -> the PDF -> sent -> opened.
+     Every touch shows a tap mark. It drives the REAL app (same clicks a
+     person makes), waiting for each screen rather than trusting timers.
+     A tap on the phone, Stop, or Start again hands control back.
+     ================================================================== */
+  var tour = null;
+  var watchBtn = $('watch'), shield = $('shield'), tapEl = $('tap');
+  function Stopped() {}
+  function live(t) { if (tour !== t) throw new Stopped(); }
+  function wait(t, ms) { return new Promise(function (ok) { setTimeout(ok, ms); }).then(function () { live(t); }); }
+  /* wait until fn() gives something, checking every 150 ms */
+  function until(t, fn, ms, what) {
+    var t0 = Date.now();
+    return new Promise(function (ok, no) {
+      (function look() {
+        if (tour !== t) return no(new Stopped());
+        var v = null; try { v = fn(); } catch (e) { v = null; }
+        if (v) return ok(v);
+        if (Date.now() - t0 > (ms || 15000)) return no(new Error('waited too long for ' + what));
+        setTimeout(look, 150);
+      }());
+    });
+  }
+  function doc() { try { return app.contentDocument; } catch (e) { return null; } }
+  function win() { return app.contentWindow; }
+  function q(sel) { var d = doc(); return d && d.querySelector(sel); }
+  function visible(el) { if (!el) return null; var r = el.getBoundingClientRect(); return r.width && r.height ? el : null; }
+  function appAt(path) { try { return (win().location.pathname + win().location.search).indexOf(path) !== -1 && doc().readyState === 'complete'; } catch (e) { return false; } }
+
+  /* the tap mark, centred on an element of the app (inside the frame) or of the phone */
+  function mark(el) {
+    var sr = screen.getBoundingClientRect(), s = sr.width / screen.offsetWidth, x, y;
+    var r = el.getBoundingClientRect();
+    if (el.ownerDocument === document) { x = (r.left + r.width / 2 - sr.left) / s; y = (r.top + r.height / 2 - sr.top) / s; }
+    else { x = app.offsetLeft + r.left + r.width / 2; y = app.offsetTop + r.top + r.height / 2; }
+    tapEl.style.left = x + 'px'; tapEl.style.top = y + 'px';
+    tapEl.classList.remove('on'); void tapEl.offsetWidth; tapEl.classList.add('on');
+  }
+  function tap(t, el, how) {
+    mark(el);
+    return wait(t, 330).then(function () {
+      if (how) how(el); else if (typeof el.click === 'function') el.click();
+      else el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      return wait(t, 450);
+    });
+  }
+  /* bring an element of the app into view, smoothly, as a thumb would */
+  function show(t, el, block) {
+    el.scrollIntoView({ block: block || 'center', behavior: 'smooth' });
+    return wait(t, 900);
+  }
+  function type(t, input, text) {
+    input.focus();
+    var i = 0;
+    return (function next() {
+      if (i > text.length) return wait(t, 200);
+      input.value = text.slice(0, i++);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      return wait(t, 55).then(next);
+    }());
+  }
+  /* scroll a box down in steps, so the eye can follow */
+  function glide(t, box, steps, pause) {
+    var n = 0;
+    return (function next() {
+      if (n++ >= steps) return wait(t, 0);
+      box.scrollTo({ top: Math.min(box.scrollHeight, box.scrollTop + box.clientHeight * 0.85), behavior: 'smooth' });
+      return wait(t, pause).then(next);
+    }());
+  }
+
+  function play() {
+    var t = {};
+    stopTour(true);
+    tour = t;
+    try { localStorage.removeItem('mm.session.v1'); sessionStorage.removeItem('mm.audience'); } catch (e) {}   /* start signed out, nothing remembered: every step is part of the story */
+    ring();
+    tour = t;                                                        /* ring() resets the phone, not the tour */
+    watchBtn.setAttribute('aria-pressed', 'true'); watchBtn.querySelector('.wl').textContent = 'Stop';
+    watchBtn.querySelector('.wi').textContent = '■';
+    shield.hidden = false;
+
+    wait(t, 2600)
+      /* 1. the broker's message */
+      .then(function () { return tap(t, note); })
+      /* 2. sign in */
+      .then(function () { return until(t, function () { return appAt('login.html') && visible(q('#who')); }, 15000, 'the sign-in'); })
+      .then(function () { return wait(t, 1300); })
+      .then(function () { return tap(t, q('#who'), function (el) { el.focus(); }); })
+      .then(function () { return type(t, q('#who'), 'sales@demo.local'); })
+      .then(function () { return tap(t, q('#code'), function (el) { el.focus(); }); })
+      .then(function () { return type(t, q('#code'), '1111'); })
+      .then(function () { return tap(t, q('#go')); })
+      /* 3. Moray, then Moray Wellness (each plays its own entry) */
+      .then(function () { return until(t, function () { return appAt('projects.html') && visible(q('a[href*="p=moray"]')); }, 15000, 'the projects'); })
+      .then(function () { return wait(t, 2600); })
+      .then(function () { var a = q('a[href*="p=moray"]'); return show(t, a).then(function () { return tap(t, a); }); })
+      .then(function () { return until(t, function () { return appAt('p=moray') && visible(q('a[href*="line=wellness"]')); }, 20000, 'Moray'); })
+      .then(function () { return wait(t, 3200); })
+      .then(function () { var a = q('a[href*="line=wellness"]'); return show(t, a).then(function () { return tap(t, a); }); })
+      .then(function () { return until(t, function () { return appAt('line=wellness') && visible(q('.fd-toggle')); }, 20000, 'Moray Wellness'); })
+      .then(function () { return wait(t, 3800); })
+      /* 4. Find a unit: By unit, 1st floor, the cheapest match */
+      .then(function () { var b = q('.fd-toggle'); return show(t, b, 'start').then(function () { return tap(t, b); }); })
+      .then(function () { return wait(t, 500); })
+      .then(function () {
+        var pane = [].filter.call(doc().querySelectorAll('.fd-pane'), function (p) { return !p.hidden; })[0];
+        var fb = pane.querySelector('.fd-floor-btn');
+        return show(t, fb).then(function () { return tap(t, fb); }).then(function () {
+          var chip = [].filter.call(pane.querySelectorAll('.fd-floor-menu .fd-chip'), function (c) { return c.textContent.trim() === '1st'; })[0];
+          return tap(t, chip);
+        });
+      })
+      .then(function () { return until(t, function () { return visible(q('.fd-opt.is-best')); }, 8000, 'the answer'); })
+      .then(function (card) { return show(t, card).then(function () { return wait(t, 1700); }).then(function () { return tap(t, card); }); })
+      /* 5. the floor drawing: the answer glowing; then open it */
+      .then(function () { return until(t, function () { return visible(q('.q-ulayer .q-u[data-code="E125"]')); }, 8000, 'the drawing'); })
+      .then(function () { return show(t, q('.q-ulayer')).then(function () { return wait(t, 2200); }); })
+      .then(function () {
+        return tap(t, q('.q-ulayer .q-u[data-code="E125"]'), function (el) { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+      })
+      /* 6. the payment plan, and the schedule */
+      .then(function () { return until(t, function () { return visible(q('.q-plansel')); }, 8000, 'the unit'); })
+      .then(function () { return wait(t, 1100); })
+      .then(function () {
+        var ps = q('.q-plansel');
+        return show(t, ps).then(function () {
+          return tap(t, ps, function (el) { el.value = 'o30-10'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+        });
+      })
+      .then(function () { return until(t, function () { return visible(q('.q-sched-wrap')); }, 6000, 'the schedule'); })
+      .then(function () { return show(t, q('.q-tiles'), 'start').then(function () { return wait(t, 1800); }); })
+      .then(function () { return show(t, q('.q-sched-wrap'), 'start').then(function () { return wait(t, 1200); }); })
+      .then(function () { var sc = q('.q-sched-scroll'); return sc ? glide(t, sc, 3, 800).then(function () { sc.scrollTo({ top: 0, behavior: 'smooth' }); return wait(t, 700); }) : null; })
+      /* 7. Send offer on WhatsApp: the share sheet, Sara Sales Nawy */
+      .then(function () {
+        var send = [].filter.call(doc().querySelectorAll('.q-cta'), function (b) { return /WhatsApp/.test(b.textContent); })[0];
+        return show(t, send).then(function () { return tap(t, send); });
+      })
+      /* 7b. the app asks who it is for: a special request, from Nawy */
+      .then(function () { return until(t, function () { return visible(q('.q-who.in .q-who-opt[data-a="broker"]')); }, 6000, 'the question'); })
+      .then(function () { return wait(t, 1400); })
+      .then(function () { return tap(t, q('.q-who-opt[data-a="broker"]')); })
+      .then(function () { return wait(t, 1300); })
+      .then(function () { return tap(t, q('.q-who .q-cta')); })
+      .then(function () { return until(t, function () { return $('shThumb').style.backgroundImage; }, 30000, 'the offer PDF'); })
+      .then(function () { return wait(t, 1500); })
+      .then(function () { return tap(t, document.querySelector('#shPeople .who.asked')); })
+      /* 8. WhatsApp shows the PDF; leaf through it; send */
+      .then(function () { return until(t, function () { return $('prevPages').querySelector('img') && !$('prevSend').disabled; }, 30000, 'the pages'); })
+      .then(function () { return wait(t, 1500); })
+      .then(function () { return glide(t, $('prevPages'), 6, 1000); })
+      .then(function () { $('prevPages').scrollTo({ top: 0, behavior: 'smooth' }); return wait(t, 900); })
+      .then(function () { return tap(t, $('prevSend')); })
+      /* 9. sent, read; open it as the broker sees it */
+      .then(function () { return until(t, function () { return $('docBub'); }, 8000, 'the chat'); })
+      .then(function () { return wait(t, 3000); })
+      .then(function () { return tap(t, $('docBub')); })
+      .then(function () { return until(t, function () { return $('viewPages').querySelector('img'); }, 15000, 'the viewer'); })
+      .then(function () { return wait(t, 1000); })
+      .then(function () { return glide(t, $('viewPages'), 3, 1100); })
+      .then(function () { return tap(t, document.querySelector('[data-back="view"]')); })
+      .then(function () { return wait(t, 600); })
+      .then(function () { stopTour(); toast('That’s the whole journey. Try it yourself.'); })
+      .catch(function (e) {
+        if (e instanceof Stopped) return;
+        stopTour();
+        toast('The tour stopped. Tap Start again, or carry on yourself.');
+        if (window.console) console.warn('Watch it:', e && e.message || e);
+      });
+  }
+  function stopTour(quiet) {
+    tour = null;
+    shield.hidden = true;
+    tapEl.classList.remove('on');
+    watchBtn.setAttribute('aria-pressed', 'false'); watchBtn.querySelector('.wl').textContent = 'Watch it';
+    watchBtn.querySelector('.wi').textContent = '▶';
+  }
+  watchBtn.addEventListener('click', function () { if (tour) stopTour(); else play(); });
+  $('watch2').addEventListener('click', function (e) { e.stopPropagation(); play(); });
+  shield.addEventListener('click', function () { stopTour(); toast('Your turn: carry on from here'); });
 
   note.addEventListener('click', answer);
   ring();
