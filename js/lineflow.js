@@ -1,0 +1,940 @@
+/* ------------------------------------------------------------------
+   Main Marks — a product line's page, laid out EXACTLY as the Qomor app
+   (build 68; Muhanad: "make it exactly how the Qomor app is designed",
+   in the Main Marks app's own colours).
+
+     sync bar   the inventory, when it was read, Refresh, the counts
+     1 Building the night aerial is the picker (traced roofs, lights on
+                for the chosen one); under it Qomor's bar: a chip, a
+                select naming every building with its count, a note.
+                No zoom and no "Open full size" (Muhanad, 2026-10-01).
+     2 Floor    Qomor's floor cards: code, "N available", name, use.
+     3 Unit     the units on that floor, with price, sorted.
+     4 Unit details  the unit card, the payment plan, the figures, the
+                year-grouped quarterly schedule, and the offer to send.
+
+   EVERYTHING IS READ FROM THE SHEET (js/inventory.js). The line is the
+   rows whose Type the config names (`line.match.type`); its buildings
+   are the ones those rows name; a building's floors are the line's
+   `stepFloors` plus any floor the rows name. So a unit added to the
+   sheet appears here with no code change — in its floor, in its
+   building, even in a building nobody has traced yet (it is then
+   picked from the select).
+
+   One path to a unit: the roofs, the chip select, the floor cards and
+   the unit rows all end in the same select*() functions.
+   ------------------------------------------------------------------ */
+(function (root) {
+  'use strict';
+  var MM = root.MM || (root.MM = {});
+
+  var ORDER = ['street', 'ground', 'first', 'second', 'third', 'fourth', 'fifth'];
+  var CODE = { street: 'S', ground: 'G', first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th' };
+  var USE = { Clinic: 'Clinics', Admin: 'Offices', Commercial: 'Shops', Serviced: 'Serviced apartments' };
+
+  /* the sheet's floor words -> one id ("S.Level", "Street level", "1st", "First") */
+  /* one rule for the sheet's floor word, shared with the offer PDF */
+  function floorId(raw) { return MM.inventory.floorId(raw); }
+  function money(v) { return Math.round(v).toLocaleString('en-US'); }
+  function day(d) { return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  function pct(f, dp) { return (Math.round(f * Math.pow(10, 2 + (dp || 0))) / Math.pow(10, dp || 0)) + '%'; }
+
+  function lineFlow(o) {
+    var el = MM.el, t = MM.t;
+    var page = o.page, p = o.project, l = o.line, session = o.session || {};
+    var W = p.aerial.w || 1672, H = p.aerial.h || 941;
+    var types = (l.match && l.match.type) || [];
+    /* WHICH ROWS ARE THIS LINE: Type (case-blind, the sheet is typed by
+       hand) and, where the line is a floor of a type, the floor — The
+       Fourth is Admin on the Fourth floor, Offices are Admin on 1st-3rd. */
+    var typesLC = types.map(function (x) { return String(x).trim().toLowerCase(); });
+    var onFloors = (l.match && l.match.floors) || null;
+    function inLine(u) {
+      if (typesLC.indexOf(String(u.type || '').trim().toLowerCase()) === -1) return false;
+      return !onFloors || onFloors.indexOf(floorId(u.floor)) !== -1;
+    }
+
+    var wrap = el('div', 'q');
+    page.appendChild(wrap);
+
+    /* ---- which line this is (Qomor names its project in its header) --- */
+    var title = el('div', 'q-title');
+    /* a line with no logo file of its own wears the mark its card wears
+       (Offices: Moray + the brochure heading; R- Residence: the brochure
+       lockup), built by the page and handed in as `o.mark` */
+    var logoSrc = (l.visual && l.visual.logo) || (!o.mark && l.markBuild && l.markBuild.src) || null;
+    if (o.mark) title.appendChild(o.mark);
+    else if (logoSrc) {
+      var lg = new Image();
+      lg.className = 'q-logo';
+      lg.src = logoSrc;
+      lg.alt = l.name;
+      title.appendChild(lg);
+    } else title.appendChild(el('h1', 'q-name', l.name));
+    title.appendChild(el('p', 'q-sub', t(useWord(types[0])) + ' · ' + p.name + (l.place ? ' · ' + l.place : '')));
+    wrap.appendChild(title);
+
+    /* ---- the sync bar (Qomor #sync) ------------------------------------ */
+    var sync = el('div', 'q-sync');
+    var dot = el('span', 'q-dot');
+    var syncText = el('span', 'q-synctext', t('Reading the inventory…'));
+    var refresh = el('button', 'q-ghost q-tiny', t('Refresh'));
+    refresh.type = 'button';
+    var counts = el('span', 'q-counts');
+    sync.appendChild(dot); sync.appendChild(syncText); sync.appendChild(refresh);
+    sync.appendChild(el('span', 'q-spacer')); sync.appendChild(counts);
+    wrap.appendChild(sync);
+    var warn = el('div', 'q-warn');
+    warn.hidden = true;
+    wrap.appendChild(warn);
+
+    /* ---- Find a unit (build 69): Qomor's "Customer has a budget in
+       mind?" place, Ayyam's filter. It owns nothing: every tap in it ends
+       in the select*() functions below. js/finder.js ------------------- */
+    var finder = MM.finder ? MM.finder({
+      project: p,
+      useWord: t(useWord(types[0])),
+      nameOf: function (key) { var b = byKey(key); return b ? b.name : t('Building ') + key; }
+    }) : null;
+    if (finder) wrap.appendChild(finder.node);
+    var search = { active: false, match: null, byBuilding: {} };
+    var lightAll = false;            /* after a pick, the other matches go dark until asked */
+
+    function step(n, title, hint) {
+      var s = el('section', 'q-step');
+      var h = el('h2', 'q-h');
+      h.appendChild(el('i', null, String(n)));
+      h.appendChild(el('span', null, t(title)));
+      var sm = el('small', null, hint ? t(hint) : '');
+      h.appendChild(sm);
+      s.appendChild(h);
+      s.hint = sm;
+      wrap.appendChild(s);
+      return s;
+    }
+
+    /* ---- 1 · Building ---------------------------------------------------- */
+    var s1 = step(1, 'Building', 'Tap a building on the view, or choose it below');
+    var hero = el('div', 'q-hero');
+    var canvas = el('div', 'q-canvas');
+    var base = new Image();
+    base.className = 'q-img q-base';
+    base.alt = t(p.name + ' at night — ') + l.name;
+    base.draggable = false;
+    base.src = p.aerial.img;
+    canvas.appendChild(base);
+    hero.appendChild(canvas);
+    s1.appendChild(hero);
+    var bar = el('div', 'q-bbar');
+    var chip = el('span', 'q-chip', '—');
+    var sel = el('select', 'q-select');
+    sel.setAttribute('aria-label', t('Choose a building'));
+    var bmeta = el('span', 'q-bmeta');
+    var relight = el('button', 'q-link');
+    relight.type = 'button';
+    relight.hidden = true;
+    relight.addEventListener('click', function () { lightAll = true; paint(); });
+    bar.appendChild(chip); bar.appendChild(sel); bar.appendChild(bmeta); bar.appendChild(relight);
+    s1.appendChild(bar);
+    var none = el('p', 'q-none');
+    none.hidden = true;
+    s1.appendChild(none);
+
+    var s2 = step(2, 'Floor');
+    var floorsGrid = el('div', 'q-grid');
+    s2.appendChild(floorsGrid);
+    s2.hidden = true;
+
+    var s3 = step(3, 'Unit');
+    var unitPanel = el('div', 'q-panel');
+    s3.appendChild(unitPanel);
+    s3.hidden = true;
+
+    var s4 = step(4, 'Unit details', 'Price, payment plan and the offer');
+    var detail = el('div', 'q-detail');
+    s4.appendChild(detail);
+    s4.hidden = true;
+
+    wrap.appendChild(el('p', 'src q-src', t('Inventory: ') + (p.inventory.source || p.inventory.url) +
+      t(' · Plans: Main Marks, 29 Sep 2026 · Picture: ') + p.aerial.source));
+
+    /* ---- the aerial's lights and roofs (traced by Muhanad, config) ------ */
+    var cfgB = (l.buildings || []).filter(function (b) { return b && b.id; });
+    var lights = {}, roofs = {}, glows = {};
+    function litLayer(box) {
+      var im = new Image();
+      im.className = 'q-img q-lit is-off';
+      im.alt = ''; im.draggable = false;
+      im.setAttribute('aria-hidden', 'true');
+      im.src = l.lit;
+      var pc = function (v, of) { return (v / of * 100).toFixed(3) + '%'; };
+      im.style.clipPath = 'inset(' + pc(box[1], H) + ' ' + pc(W - box[2], W) + ' ' + pc(H - box[3], H) + ' ' + pc(box[0], W) + ')';
+      canvas.appendChild(im);
+      return im;
+    }
+    if (l.lit) cfgB.forEach(function (b) { if (b.light && b.light.length === 4) lights[b.id] = litLayer(b.light); });
+    /* A line whose buildings are not traced yet (Offices, The Fourth,
+       R- Residence) has no per-building lights to switch, so the WHOLE
+       line's lit picture stays on — the same picture its card lights on
+       the Moray page — and the building is chosen from the select. Its
+       roofs join the moment they are traced into config. */
+    if (l.lit && !Object.keys(lights).length) {
+      var whole = litLayer([0, 0, W, H]);
+      whole.classList.remove('is-off');
+    }
+    if (!cfgB.some(function (b) { return b.roof && b.roof.length >= 3; })) s1.hint.textContent = t('Choose a building below');
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('class', 'lp-roofs is-idle');
+    svg.innerHTML = '<defs><filter id="lp-glow" x="-15%" y="-15%" width="130%" height="130%">' +
+      '<feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>' +
+      '<feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+    cfgB.filter(function (b) { return b.roof && b.roof.length >= 3; }).forEach(function (b) {
+      var pts = b.roof.map(function (q) { return q[0] + ',' + q[1]; }).join(' ');
+      var glow = document.createElementNS(NS, 'polygon');
+      glow.setAttribute('points', pts);
+      glow.setAttribute('class', 'lp-roof-glow');
+      glow.setAttribute('filter', 'url(#lp-glow)');
+      svg.appendChild(glow);
+      glows[b.id] = glow;
+      var g = document.createElementNS(NS, 'polygon');
+      g.setAttribute('points', pts);
+      g.setAttribute('class', 'lp-roof');
+      g.setAttribute('tabindex', '0');
+      g.setAttribute('role', 'button');
+      g.setAttribute('aria-label', b.name);
+      g.addEventListener('click', function () { selectBuilding(b.id, true); });
+      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectBuilding(b.id, true); } });
+      svg.appendChild(g);
+      roofs[b.id] = g;
+    });
+    canvas.appendChild(svg);
+
+    /* The count badge on each traced roof while a search is on. A REAL
+       button, not an ::after: on Ayyam the drawn badge swallowed the tap,
+       and the number is exactly what people tap (playbook 01, round 2).
+       It sits ON the roof's top edge, centred on it, in % of the picture so
+       it rides any resize — on a phone a roof is ~45 px wide, and a badge
+       on its centre hid the very roof it was lighting (build 69). */
+    var badges = {};
+    cfgB.filter(function (b) { return roofs[b.id]; }).forEach(function (b) {
+      var sx = 0, top = Infinity;
+      b.roof.forEach(function (q) { sx += q[0]; top = Math.min(top, q[1]); });
+      var bd = el('button', 'q-badge');
+      bd.type = 'button';
+      bd.hidden = true;
+      bd.style.left = (sx / b.roof.length / W * 100).toFixed(2) + '%';
+      bd.style.top = (top / H * 100).toFixed(2) + '%';
+      bd.addEventListener('click', function () { selectBuilding(b.id, true); });
+      canvas.appendChild(bd);
+      badges[b.id] = bd;
+    });
+
+    /* ---- the data -------------------------------------------------------- */
+    var rows = [], buildings = [], cur = { b: null, f: null, u: null };
+
+    function build(res) {
+      rows = res.all.filter(inLine);
+      rows.forEach(function (u) { u.fid = floorId(u.floor); });
+      /* the buildings: the traced ones first, in the picture's order, then
+         any building the sheet names that nobody has traced yet */
+      var SIDE = { left: 0, right: 1 };
+      buildings = cfgB.slice().sort(function (a, c) { return (SIDE[a.side] || 0) - (SIDE[c.side] || 0); })
+        .map(function (b) { return { id: b.id, name: b.name, key: b.inventory || b.id, traced: !!roofs[b.id] }; });
+      rows.forEach(function (u) {
+        if (!buildings.some(function (b) { return b.key === u.building; })) {
+          buildings.push({ id: u.building, name: t('Building ') + u.building, key: u.building, traced: false });
+        }
+      });
+      buildings.forEach(function (b) {
+        b.rows = rows.filter(function (u) { return u.building === b.key; });
+        b.avail = b.rows.filter(function (u) { return u.sellable; }).length;
+        b.hold = b.rows.filter(function (u) { return u.status === 'On hold'; }).length;
+      });
+      var avail = rows.filter(function (u) { return u.sellable; }).length;
+      counts.textContent = rows.length + ' ' + t(useWord(types[0]).toLowerCase()) + ' · ' + avail + t(' available');
+      sel.textContent = '';
+      var ph = el('option', null, t('Choose a building'));
+      ph.value = ''; ph.disabled = true; ph.selected = true;
+      sel.appendChild(ph);
+      buildings.forEach(function (b) {
+        var op = el('option', null, b.name + ' — ' + (b.avail ? b.avail + t(' available') : t('none available')));
+        op.value = b.id;
+        sel.appendChild(op);
+      });
+      if (res.problems && res.problems.length) {
+        warn.hidden = false;
+        warn.textContent = '';
+        res.problems.forEach(function (m) { warn.appendChild(el('p', null, m)); });
+      }
+      if (finder) finder.setUnits(rows);
+      /* NOTHING IN THE SHEET YET (R- Residence today): say so, plainly,
+         and offer nothing — no building select, no search over nothing.
+         The page fills by itself the moment such rows are added. */
+      var empty = !rows.length;
+      bar.hidden = empty;
+      if (finder) finder.node.hidden = empty;
+      none.hidden = !empty;
+      if (empty) s1.hint.textContent = '';
+      none.textContent = empty ? t('There are no ' + useWord(types[0]).toLowerCase() +
+        ' in Main Marks’ inventory yet. They appear here the moment they are added to the sheet.') : '';
+    }
+    function useWord(type) { return USE[type] || type || ''; }
+    function byKey(key) { return buildings.filter(function (b) { return b.key === key; })[0]; }
+
+    /* ---- what the search lights ------------------------------------------
+       Before a pick: every matching building's roof breathes, its lights
+       come on and it carries its count; the picture dims. After a pick:
+       only the chosen one, with one link to light the rest again (Ayyam,
+       round 2). Inside the building the floors and units follow it. */
+    if (finder) {
+      finder.onChange(function (out) { search = out; paint(); });
+      finder.onPickBuilding(function (key) { var b = byKey(key); if (b) selectBuilding(b.id, false); });
+      finder.onShowUnit(function (u, plan) {
+        var b = byKey(u.building);
+        if (!b || !u.sellable) return;               /* fail closed: only a sellable unit is opened */
+        selectBuilding(b.id, false);
+        selectFloor(u.fid);
+        if (plan) planId = plan;
+        selectUnit(u.code);
+        go(s3);                                      /* the drawing first: the unit glows there */
+      });
+    }
+    function paint() {
+      var on = search.active;
+      canvas.classList.toggle('is-searching', on);
+      svg.classList.toggle('is-searching', on);
+      var others = 0;
+      var bestRow = search.best ? rows.filter(function (x) { return x.code === search.best; })[0] : null;
+      buildings.forEach(function (b) {
+        var n = on ? (search.byBuilding[b.key] || 0) : 0;
+        var isBest = !!(bestRow && bestRow.building === b.key);
+        if (roofs[b.id]) roofs[b.id].classList.toggle('is-best', isBest);
+        if (glows[b.id]) glows[b.id].classList.toggle('is-best', isBest);
+        var shown = n > 0 && (!cur.b || lightAll || b.id === cur.b);
+        if (n > 0 && cur.b && b.id !== cur.b) others += n;
+        if (roofs[b.id]) roofs[b.id].classList.toggle('is-match', shown);
+        if (badges[b.id]) {
+          badges[b.id].classList.toggle('is-best', isBest);
+          badges[b.id].hidden = !shown;
+          badges[b.id].textContent = String(n);
+          badges[b.id].setAttribute('aria-label', b.name + ', ' + n + t(' matching units'));
+        }
+        if (lights[b.id]) lights[b.id].classList.toggle('is-off', !(b.id === cur.b || (on && shown)));
+      });
+      relight.hidden = !(on && cur.b && others && !lightAll);
+      relight.textContent = t('Light the other ') + others + (others === 1 ? t(' match') : t(' matches'));
+      var b = buildings.filter(function (x) { return x.id === cur.b; })[0];
+      if (b && !s2.hidden) renderFloors(b);
+      if (b && cur.f && !s3.hidden) { selectFloor(cur.f, true); return; }   /* rows, drawing and step 4 follow the budget */
+      [].forEach.call(unitPanel.querySelectorAll('.q-unit, .q-u'), function (r) {
+        var u = rows.filter(function (x) { return x.code === r.dataset.code; })[0];
+        r.classList.toggle('is-nomatch', !!(on && u && !search.match(u)));
+      });
+    }
+
+    function load() {
+      dot.className = 'q-dot';
+      syncText.textContent = t('Reading the inventory…');
+      return MM.inventory.load(p.inventory).then(function (res) {
+        build(res);
+        dot.className = 'q-dot is-live';
+        var now = new Date();
+        syncText.textContent = '';
+        syncText.appendChild(el('b', null, t('Inventory')));
+        syncText.appendChild(document.createTextNode(t(' · read ') +
+          String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0')));
+        if (cur.b) selectBuilding(cur.b, false, true);
+      }).catch(function (err) {
+        /* fail closed: nothing is offered from a sheet we could not read */
+        dot.className = 'q-dot is-bad';
+        syncText.textContent = t('The inventory could not be read.');
+        warn.hidden = false;
+        warn.textContent = String(err && err.message || err);
+        s2.hidden = s3.hidden = s4.hidden = true;
+      });
+    }
+    refresh.addEventListener('click', load);
+    sel.addEventListener('change', function () { selectBuilding(sel.value, false); });
+
+    function go(section) {
+      if (window.matchMedia('(max-width: 820px)').matches) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* ---- 1 → 2 ------------------------------------------------------------ */
+    function selectBuilding(id, fromPicture, keep) {
+      var b = buildings.filter(function (x) { return x.id === id; })[0];
+      if (!b) return;
+      cur.b = id;
+      if (!keep) { cur.f = null; cur.u = null; }
+      sel.value = id;
+      chip.textContent = id;
+      chip.classList.add('is-on');
+      bmeta.textContent = b.hold ? b.hold + t(' on hold') : '';
+      Object.keys(roofs).forEach(function (k) { roofs[k].classList.toggle('is-on', k === id); });
+      Object.keys(glows).forEach(function (k) { glows[k].classList.toggle('is-on', k === id); });
+      svg.classList.remove('is-idle');
+      lightAll = false;
+      s2.hidden = false;
+      paint();                       /* lights, badges, and the floors with their matches */
+      if (!keep) { s3.hidden = true; s4.hidden = true; go(s2); }
+      else if (cur.f) selectFloor(cur.f, true);
+    }
+
+    function floorName(fid) {
+      var f = (p.floors || []).filter(function (x) { return x.id === fid; })[0];
+      if (fid === 'street') return t('Street level');
+      return f ? t(f.name + ' Floor') : fid;
+    }
+
+    function renderFloors(b) {
+      floorsGrid.textContent = '';
+      var ids = (l.stepFloors || []).slice();
+      b.rows.forEach(function (u) { if (ids.indexOf(u.fid) === -1) ids.push(u.fid); });
+      ids.sort(function (a, c) { return ORDER.indexOf(a) - ORDER.indexOf(c); });
+      ids.forEach(function (fid) {
+        var on = b.rows.filter(function (u) { return u.fid === fid; });
+        var av = on.filter(function (u) { return u.sellable; }).length;
+        var hold = on.filter(function (u) { return u.status === 'On hold'; }).length;
+        /* while a search is on, the floor says how many of ITS units match,
+           and a floor with none steps back (still openable) */
+        var hits = search.active ? on.filter(search.match).length : null;
+        var card = el('button', 'q-card' + (hits === 0 ? ' is-nomatch' : ''));
+        card.type = 'button';
+        card.disabled = !av;
+        var r = el('div', 'q-row');
+        r.appendChild(el('span', 'q-id', CODE[fid] || fid));
+        r.appendChild(el('span', 'q-pill' + (av ? '' : ' none'),
+          hits ? hits + t(' match') : (av ? av + t(' available') : t('none available'))));
+        card.appendChild(r);
+        card.appendChild(el('span', 'q-val', floorName(fid)));
+        card.appendChild(el('span', 'q-lab', useWord(types[0]) + (hold ? ' · ' + hold + t(' on hold') : '')));
+        /* the floor that holds the answer carries it, in green */
+        var here = on.filter(isAnswer)[0];
+        if (here) {
+          card.classList.add('is-best');
+          card.appendChild(el('span', 'q-cbest', t(TAG[search.kind] || 'Best fit') + ' · ' + here.code));
+        }
+        card.dataset.floor = fid;
+        card.classList.toggle('is-on', cur.f === fid);
+        card.addEventListener('click', function () { selectFloor(fid); });
+        floorsGrid.appendChild(card);
+      });
+    }
+
+    /* ---- the floor drawing in step 3 (build 71) ----------------------------
+       The brochure's whole-floor drawing sits at the back, dimmed and pushed
+       back; the chosen building's part of the SAME drawing is lifted to the
+       front at full brightness. No second picture: the lifted piece is the
+       drawing itself, cut by the building's box in config (`plans`), so it
+       can never disagree with the floor behind it.
+       Muhanad chose "Front and centre" (2026-10-01) over "In its place": the
+       building comes to the middle, grown, over the WHOLE blurred floor (never
+       zoomed). As numbers: `fill` = how much of the frame it takes, `lift` =
+       how much closer it comes, `back` / `dim` / `blur` = how far back the
+       floor sits. */
+    var VIEW = { fill: 0.72, lift: 1.12, back: 0.97, dim: 0.5, blur: 1.1 };
+
+    /* ---- the units on the lifted building (build 72) ------------------------
+       Each unit Muhanad traced (config `unitShapes`, corners in the floor
+       drawing's own px, the same space as `plates`) is drawn over the lifted
+       piece. A sellable unit is a real button: a tap opens it exactly as the
+       list does, and picking it in the list lights it here. On hold shows,
+       dimmed, and cannot be opened (fail closed). A unit with no outline yet
+       is simply not drawn: it is still in the list. */
+    /* the other units that fit the budget (build 75): marked on every draw,
+       but only lit while "Show other options" is on. Off by default; the
+       choice is kept here so a re-draw (paint → selectFloor) keeps it. */
+    var showOthers = false;
+    var glowSeq = 0;
+    function unitLayer(box, rows) {
+      var shapesCfg = p.unitShapes || {};
+      var drawn = rows.filter(function (u) { var s = shapesCfg[u.code]; return s && s.length >= 3; });
+      if (!drawn.length) return null;
+      var NSu = 'http://www.w3.org/2000/svg';
+      var s = document.createElementNS(NSu, 'svg');
+      s.setAttribute('class', 'q-ulayer' + (showOthers ? ' show-alt' : ''));
+      s.setAttribute('viewBox', box[0] + ' ' + box[1] + ' ' + (box[2] - box[0]) + ' ' + (box[3] - box[1]));
+      s.setAttribute('preserveAspectRatio', 'none');
+      var bestCode = search.best;
+      var alts = drawn.filter(isOption);
+      var lit = alts.slice();
+      if (bestCode && drawn.some(function (u) { return u.code === bestCode; })) lit.unshift({ code: bestCode, best: true });
+      if (lit.length) {
+        var fid = 'q-bestglow-' + (++glowSeq);
+        s.innerHTML = '<defs><filter id="' + fid + '" x="-40%" y="-40%" width="180%" height="180%">' +
+          '<feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/></feMerge></filter></defs>';
+        lit.forEach(function (x) {
+          var glow = document.createElementNS(NSu, 'polygon');
+          glow.setAttribute('points', shapesCfg[x.code].map(function (q) { return q[0] + ',' + q[1]; }).join(' '));
+          glow.setAttribute('class', 'q-u-glow' + (x.best ? '' : ' is-alt'));
+          glow.setAttribute('filter', 'url(#' + fid + ')');
+          s.appendChild(glow);
+        });
+      }
+      s.altCount = alts.length;
+      drawn.forEach(function (u) {
+        var g = document.createElementNS(NSu, 'polygon');
+        g.setAttribute('points', shapesCfg[u.code].map(function (q) { return q[0] + ',' + q[1]; }).join(' '));
+        g.setAttribute('class', 'q-u ' + (u.sellable ? 'is-avail' : 'is-held') + (cur.u === u.code ? ' is-on' : '') +
+          (search.best === u.code ? ' is-best' : '') +
+          (alts.indexOf(u) !== -1 ? ' is-alt' : ''));
+        g.dataset.code = u.code;
+        if (u.sellable) {
+          g.setAttribute('tabindex', '0');
+          g.setAttribute('role', 'button');
+          g.setAttribute('aria-label', u.code + ' · ' + money(u.area) + ' m² · ' + money(u.listPrice));
+          g.addEventListener('click', function () { selectUnit(u.code); });
+          g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectUnit(u.code); } });
+        } else g.setAttribute('aria-label', u.code + ' · ' + u.status);
+        if (search.active && !search.match(u)) g.classList.add('is-nomatch');
+        s.appendChild(g);
+      });
+      return s;
+    }
+
+    function floorPlate(b, fid, quiet, rows) {
+      /* the cut Muhanad drew in tools/cut-buildings.html (config `plates`, by the
+         sheet's building name). No cut, no drawing: a guessed box took part of
+         the next building, so nothing is guessed */
+      var box = p.plates && p.plates[b.key] && p.plates[b.key][fid];
+      var f = (p.floors || []).filter(function (x) { return x.id === fid; })[0];
+      if (!box || !f || !f.img) return null;
+      var bw = box[2] - box[0], bh = box[3] - box[1];
+
+      var holder = el('div', 'q-plate-wrap');
+      var plate = el('div', 'q-plate');
+      var back = new Image();
+      back.className = 'q-plate-back';
+      back.alt = '';
+      back.setAttribute('aria-hidden', 'true');
+      back.draggable = false;
+      back.src = f.img;
+      var lift = el('div', 'q-plate-lift');
+      lift.setAttribute('role', 'img');
+      lift.setAttribute('aria-label', b.name + ' · ' + floorName(fid) + t(' · layout'));
+      /* a sharp picture of exactly this cut, when there is one (config `plateImgs`) */
+      var sharp = p.plateImgs && p.plateImgs[b.key] && p.plateImgs[b.key][fid];
+      lift.style.backgroundImage = 'url("' + (sharp || f.img) + '")';
+      if (sharp) { lift.style.backgroundSize = '100% 100%'; lift.style.backgroundPosition = '0 0'; }
+      plate.appendChild(back);
+      plate.appendChild(lift);
+      var units = unitLayer(box, rows || []);
+      if (units) lift.appendChild(units);
+      holder.appendChild(plate);
+      /* the answer is named under the drawing, so it is never lost: glowing
+         when its outline is traced, otherwise the first row of the list */
+      var ansU = (rows || []).filter(isAnswer)[0];
+      if (ansU) {
+        var traced = !!(units && units.querySelector('.q-u.is-best'));
+        holder.appendChild(el('p', 'q-plate-ans', ansU.code + ' · ' + t(TAG[search.kind] || 'Best fit') +
+          (traced ? t('. Glowing on the drawing.') : t('. First in the list below.'))));
+      }
+      /* Muhanad, 2026-10-02: the best fit alone by default; one button lights
+         the rest that fit, in their own colour. Only while a budget is typed
+         and some other fitting unit on this floor has an outline. */
+      if (units && units.altCount) {
+        var n = units.altCount;
+        var more = el('button', 'q-altbtn');
+        more.type = 'button';
+        var label = function () {
+          more.setAttribute('aria-pressed', String(showOthers));
+          more.textContent = showOthers ? t('Hide other options') :
+            t('Show other options') + ' (' + n + t(' on this floor') + ')';
+        };
+        label();
+        more.addEventListener('click', function () {
+          showOthers = !showOthers;
+          units.classList.toggle('show-alt', showOthers);
+          label();
+        });
+        holder.appendChild(more);
+      }
+      holder.appendChild(el('p', 'q-plate-src', t('Drawing: ') + (f.source || p.name) + (sharp ? t(' · sharpened copy') : '')));
+
+      var shown = false;
+      function lay() {
+        var iw = back.naturalWidth, ih = back.naturalHeight;
+        var pw = plate.clientWidth, ph = plate.clientHeight;
+        if (!iw || !pw || !ph) return;
+        if (!sharp) {
+          lift.style.backgroundSize = (iw / bw * 100) + '% ' + (ih / bh * 100) + '%';
+          lift.style.backgroundPosition = (box[0] / (iw - bw) * 100) + '% ' + (box[1] / (ih - bh) * 100) + '%';
+        }
+        /* the whole floor fitted in the frame (object-fit: contain), and the
+           building's spot and size on it — where the lift starts */
+        var s = Math.min(pw / iw, ph / ih);
+        var c00 = { x: (pw - iw * s) / 2 + (box[0] + bw / 2) * s, y: (ph - ih * s) / 2 + (box[1] + bh / 2) * s };
+        var start = { x: c00.x - bw * s / 2, y: c00.y - bh * s / 2, w: bw * s, h: bh * s };
+        var V = VIEW;
+        /* the WHOLE floor stays in view behind, never zoomed (Muhanad,
+           2026-10-01), only set back a little */
+        var k = V.back;
+        var cam = 'translate(' + (pw / 2 * (1 - k)) + 'px,' + (ph / 2 * (1 - k)) + 'px) scale(' + k + ')';
+        var bw0 = bw * s * k, bh0 = bh * s * k;
+        /* the building alone is brought close: grown until it fills `fill` of the frame */
+        var Z = Math.max(1, Math.min(pw * V.fill / bw0, ph * V.fill / bh0));
+        var gw = bw0 * Z * V.lift, gh = bh0 * Z * V.lift;
+        back.style.transformOrigin = '0 0';
+        back.style.transform = cam;
+        back.style.filter = 'brightness(' + V.dim + ') saturate(.45) blur(' + V.blur + 'px)';
+        /* the piece: in the middle of the frame, grown */
+        var to = { x: (pw - gw) / 2, y: (ph - gh) / 2, w: gw, h: gh };
+        lift.style.left = to.x + 'px'; lift.style.top = to.y + 'px';
+        lift.style.width = to.w + 'px'; lift.style.height = to.h + 'px';
+        lift.style.transformOrigin = '0 0';
+        if (shown) return;
+        shown = true;
+        plate.classList.add('is-ready');
+        if (quiet || !lift.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        /* the whole floor, then it settles back while the building lifts off it */
+        var ease = { duration: 1000, easing: 'cubic-bezier(.25,.7,.15,1)', fill: 'backwards' };
+        back.animate([{ transform: 'none' }, { transform: cam }], ease);
+        lift.animate([
+          { transform: 'translate(' + (start.x - to.x) + 'px,' + (start.y - to.y) + 'px) scale(' + (start.w / to.w) + ')', boxShadow: '0 0 0 0 rgba(0,0,0,0)', filter: 'brightness(.45)' },
+          { filter: 'brightness(1)', offset: 0.4 },
+          { transform: 'none' }
+        ], ease);
+      }
+      if (back.complete && back.naturalWidth) requestAnimationFrame(lay);
+      else back.addEventListener('load', lay);
+      if (window.ResizeObserver) new ResizeObserver(function () { lay(); }).observe(plate);
+      return holder;
+    }
+
+    /* ---- 2 → 3 ------------------------------------------------------------ */
+    var sortBy = 'code';
+    function selectFloor(fid, keep) {
+      var b = buildings.filter(function (x) { return x.id === cur.b; })[0];
+      if (!b) return;
+      cur.f = fid;
+      if (!keep) cur.u = null;
+      [].forEach.call(floorsGrid.children, function (c) { c.classList.toggle('is-on', c.dataset.floor === fid); });
+      var on = b.rows.filter(function (u) { return u.fid === fid; });
+      var av = on.filter(function (u) { return u.sellable; });
+      s3.hint.textContent = '— ' + av.length + t(av.length === 1 ? ' available on this floor' : ' available on this floor');
+      unitPanel.textContent = '';
+      var head = el('div', 'q-phead');
+      head.appendChild(el('p', 'q-pcount', b.name + ' · ' + floorName(fid)));
+      var sort = el('select', 'q-select q-sort');
+      sort.setAttribute('aria-label', t('Sort the units'));
+      [['code', 'Sort: unit number'], ['price', 'Sort: price, low to high'], ['priceD', 'Sort: price, high to low'], ['area', 'Sort: size, small to large']]
+        .forEach(function (x) { var op = el('option', null, t(x[1])); op.value = x[0]; sort.appendChild(op); });
+      sort.value = sortBy;
+      sort.addEventListener('change', function () { sortBy = sort.value; selectFloor(fid, true); });
+      head.appendChild(sort);
+      unitPanel.appendChild(head);
+      var plateNode = floorPlate(b, fid, keep, on);
+      if (plateNode) unitPanel.appendChild(plateNode);
+      var list = el('div', 'q-units');
+      var cmp = {
+        code: function (a, c) { return a.code.localeCompare(c.code, 'en', { numeric: true }); },
+        price: function (a, c) { return a.listPrice - c.listPrice; },
+        priceD: function (a, c) { return c.listPrice - a.listPrice; },
+        area: function (a, c) { return a.area - c.area; }
+      }[sortBy];
+      /* on hold is shown, after the rest, with no price — the salesperson
+         needs to know it exists and is held; a customer beside them does
+         not need its price */
+      /* while a budget is typed, what fits comes first, the best fit on top
+         (the same order as the options in Find a unit); the rest keep the sort */
+      var sorted = av.slice().sort(cmp);
+      if (search.offer) sorted.sort(function (x, y) {
+        var fx = fitOf(x), fy = fitOf(y);
+        if (!!fx !== !!fy) return fx ? -1 : 1;
+        return fx ? (y.listPrice - x.listPrice || y.area - x.area) : 0;
+      });
+      /* the answer always heads the list, whatever the sort */
+      if (search.best) sorted.sort(function (x, y) { return (isAnswer(y) ? 1 : 0) - (isAnswer(x) ? 1 : 0); });
+      sorted.concat(on.filter(function (u) { return !u.sellable; })).forEach(function (u) {
+        var row = el(u.sellable ? 'button' : 'div', 'q-unit' + (u.sellable ? '' : ' is-held'));
+        if (u.sellable) row.type = 'button';
+        row.appendChild(el('span', 'q-ucode', u.code));
+        row.appendChild(el('span', 'q-umeta', money(u.area) + ' m² · ' + useWord(u.type).replace(/s$/, '')));
+        row.appendChild(el('span', 'q-uprice', u.sellable ? money(u.listPrice) : u.status));
+        var fo = fitOf(u), ans = isAnswer(u);
+        var plan = fo ? t(fo.label) + ' · ' +
+          (fo.cash ? money(fo.down) + t(' cash') : money(fo.down) + t(' down · ') + money(fo.each) + t(' / quarter')) : '';
+        if (ans) {
+          row.appendChild(el('span', 'q-ufit is-best', t(TAG[search.kind] || 'Best fit') + (plan ? ' · ' + plan : '')));
+          row.classList.add('is-best');
+        } else if (fo) row.appendChild(el('span', 'q-ufit', t('Fits · ') + plan));
+        if (u.sellable) {
+          row.classList.toggle('is-on', cur.u === u.code);
+          row.addEventListener('click', function () { selectUnit(u.code); });
+        }
+        row.dataset.code = u.code;
+        list.appendChild(row);
+      });
+      unitPanel.appendChild(list);
+      if (search.active) [].forEach.call(list.children, function (row) {
+        var u = on.filter(function (x) { return x.code === row.dataset.code; })[0];
+        row.classList.toggle('is-nomatch', !!(u && !search.match(u)));
+      });
+      s3.hidden = false;
+      if (!keep) { s4.hidden = true; go(s3); }
+      else if (cur.u) selectUnit(cur.u, true);
+    }
+
+    /* ---- 3 → 4 ------------------------------------------------------------ */
+    var planId = null;
+    /* the offer ends by itself; one rule, shared with Find a unit */
+    function plansFor(u) { return MM.plans.applicable(p.plans, u.type); }
+
+    /* the plan to offer a unit on, when a budget is typed and the unit fits it
+       (Find a unit owns the rule: one answer everywhere) */
+    function fitOf(u) {
+      return (search.offer && u.sellable && search.match && search.match(u)) ? search.offer(u) : null;
+    }
+
+    /* THE ANSWER from Find a unit (build 76): one unit, whichever tab asked,
+       green on its building, its floor card, its row and the drawing. The
+       other options are the units that answer the same question: they fit
+       the budget, or, with filters only, they match. */
+    var TAG = { fit: 'Best fit', cheapest: 'Cheapest match', closest: 'Closest — over budget', available: 'Cheapest available' };
+    function isAnswer(u) { return !!search.best && u.code === search.best; }
+    function isOption(u) {
+      if (!u.sellable || isAnswer(u)) return false;
+      if (search.offer) return !!fitOf(u);
+      return search.kind === 'cheapest' && !!search.match && search.match(u);
+    }
+
+    function selectUnit(code, keep) {
+      var u = rows.filter(function (x) { return x.code === code && x.sellable; })[0];
+      if (!u) return;
+      if (!keep) { var fo0 = fitOf(u); if (fo0) planId = fo0.id; }
+      cur.u = code;
+      [].forEach.call(unitPanel.querySelectorAll('.q-unit, .q-u'), function (r) { r.classList.toggle('is-on', r.dataset.code === code); });
+      detail.textContent = '';
+      var b = buildings.filter(function (x) { return x.id === cur.b; })[0];
+
+      var card = el('div', 'q-unitcard');
+      [['Unit', u.code], ['Floor', floorName(u.fid)], ['Type', useWord(u.type).replace(/s$/, '')],
+       ['Area', money(u.area) + ' m²'], ['Price', money(u.listPrice) + ' EGP'],
+       ['Price per m²', money(u.listPrice / u.area) + ' EGP/m²']].forEach(function (x) {
+        var c = el('div');
+        c.appendChild(el('span', 'q-lab', t(x[0])));
+        c.appendChild(el('span', 'q-v', x[1]));
+        card.appendChild(c);
+      });
+      detail.appendChild(card);
+
+      var plans = plansFor(u);
+      if (!plans.length) {
+        detail.appendChild(el('p', 'q-empty', t('No payment plan applies to this unit yet.')));
+        s4.hidden = false;
+        if (!keep) go(s4);
+        return;
+      }
+      if (!plans.some(function (pl) { return pl.id === planId; })) planId = plans[0].id;
+      detail.appendChild(el('p', 'q-k', t('Payment plan')));
+      var ps = el('select', 'q-select q-plansel');
+      ps.setAttribute('aria-label', t('Payment plan'));
+      var groups = {};
+      plans.forEach(function (pl) {
+        var gk = pl.group || 'other';
+        if (!groups[gk]) {
+          groups[gk] = el('optgroup');
+          groups[gk].label = (p.planGroups && p.planGroups[gk]) || t('Plans');
+          ps.appendChild(groups[gk]);
+        }
+        var op = el('option', null, t(pl.label));
+        op.value = pl.id;
+        groups[gk].appendChild(op);
+      });
+      ps.value = planId;
+      detail.appendChild(ps);
+      var figures = el('div', 'q-figs');
+      detail.appendChild(figures);
+      var actions = el('div', 'q-actions');
+      var send = el('button', 'q-cta', t('Send offer on WhatsApp'));
+      send.type = 'button';
+      var copy = el('button', 'q-ghost', t('Copy offer text'));
+      copy.type = 'button';
+      var note = el('span', 'q-note');
+      actions.appendChild(send); actions.appendChild(copy); actions.appendChild(note);
+      var assume = el('ul', 'q-assume');
+      (p.assumptions || []).forEach(function (a) { assume.appendChild(el('li', null, t(a))); });
+
+      var current = null;
+      function draw() {
+        var pl = plans.filter(function (x) { return x.id === ps.value; })[0];
+        planId = pl.id;
+        var s = MM.plans.schedule({ listPrice: u.listPrice, discount: pl.discount || 0, plan: pl, terms: p.terms });
+        figures.textContent = '';
+        current = null;
+        if (!s || s.broken) {
+          /* a schedule that does not foot is not shown at all */
+          figures.appendChild(el('p', 'q-empty', t('This plan could not be worked out for this unit, so it is not shown.')));
+          send.disabled = copy.disabled = true;
+          return;
+        }
+        send.disabled = copy.disabled = false;
+        current = { u: u, pl: pl, s: s, b: b };
+        var tiles = el('div', 'q-tiles');
+        function tile(k, v) { var d = el('div', 'q-tile'); d.appendChild(el('span', 'q-lab', t(k))); d.appendChild(el('span', 'q-v', v)); tiles.appendChild(d); }
+        if (s.discount && !s.cash) tile('Price after ' + pct(s.discountPct) + ' off', money(s.payable));
+        if (s.cash) {
+          tile('Cash payment · ' + pct(s.discountPct) + ' off', money(s.payable));
+          tile('You save', money(s.discount));
+        } else {
+          tile('Down payment', money(s.down));
+          tile('Quarterly', money(s.each));
+          tile('Instalments', String(s.count));
+          tile('Total payable', money(s.payable));
+        }
+        figures.appendChild(tiles);
+        if (search.budget) figures.appendChild(budgetCheck(s));
+        if (!s.cash) figures.appendChild(table(s));
+      }
+      /* against what the agent typed in Find a unit: fits, or by how much it
+         is over, and one tap to the plan that does fit */
+      function budgetCheck(s) {
+        var B = search.budget, needC = B.cash ? s.down - B.cash : 0;
+        var needQ = (B.quarter && !s.cash) ? Math.max(s.each, s.lastInstalment) - B.quarter : 0;
+        var box = el('div', 'q-budget');
+        if (needC <= 0 && needQ <= 0) {
+          box.classList.add('is-ok');
+          var have = [];
+          if (B.cash) have.push(money(s.down) + t(' down of ') + money(B.cash));
+          if (B.quarter && !s.cash) have.push(money(s.each) + t(' a quarter of ') + money(B.quarter));
+          box.appendChild(el('p', null, t('Within the client’s budget: ') + have.join(' · ') + '.'));
+          return box;
+        }
+        box.classList.add('is-over');
+        var gaps = [];
+        if (needC > 0) gaps.push(money(needC) + t(' more cash'));
+        if (needQ > 0) gaps.push(money(needQ) + t(' more a quarter'));
+        box.appendChild(el('p', null, t('Over the client’s budget on this plan: needs ') + gaps.join(t(' and ')) + '.'));
+        var fo = fitOf(u);
+        if (fo && fo.id !== ps.value) {
+          var sw = el('button', 'q-ghost q-tiny', t('Switch to ') + t(fo.label));
+          sw.type = 'button';
+          sw.addEventListener('click', function () { ps.value = fo.id; draw(); });
+          box.appendChild(sw);
+        }
+        return box;
+      }
+      ps.addEventListener('change', draw);
+      draw();
+
+      function offerText() {
+        var c = current, s = c.s, lines = [];
+        lines.push('*' + l.name + ' · ' + t(useWord(c.u.type).replace(/s$/, '')) + ' ' + c.u.code + '*');
+        lines.push(c.b.name + ' · ' + floorName(c.u.fid) + ' · ' + money(c.u.area) + ' m²');
+        lines.push(t('Price: ') + money(c.u.listPrice) + ' EGP');
+        lines.push(t('Plan: ') + t(c.pl.label) + (c.pl.until ? t(' (offer until ') + day(new Date(c.pl.until + 'T12:00:00')) + ')' : ''));
+        if (s.discount) lines.push(t('Price after ') + pct(s.discountPct) + t(' off: ') + money(s.payable) + ' EGP');
+        if (s.cash) lines.push(t('Cash payment: ') + money(s.payable) + ' EGP');
+        else {
+          lines.push(t('Down payment: ') + money(s.down) + ' EGP');
+          lines.push(t('Quarterly instalment: ') + money(s.each) + ' EGP × ' + s.count);
+        }
+        lines.push('');
+        lines.push(t('Available as of ') + day(new Date()) + (session.name ? ' · ' + session.name : '') + ' · Main Marks');
+        return lines.join('\n');
+      }
+      /* window.open must fire in the click itself, before anything async:
+         a popup opened later is blocked silently (playbook 01, 4b) */
+      send.addEventListener('click', function () {
+        if (!current) return;
+        window.open('https://wa.me/?text=' + encodeURIComponent(offerText()), '_blank', 'noopener');
+      });
+      copy.addEventListener('click', function () {
+        if (!current) return;
+        var txt = offerText();
+        var done = function () { note.textContent = t('Copied.'); setTimeout(function () { note.textContent = ''; }, 2200); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { note.textContent = t('Could not copy.'); });
+      });
+      detail.appendChild(actions);
+      detail.appendChild(assume);
+      s4.hidden = false;
+      if (!keep) go(s4);
+    }
+
+    /* Qomor's schedule: year-grouped, the down payment first, each year's
+       share of the price on its first row.
+       Build 82 (Muhanad, 2026-10-02: "make sure the payment plan table is not
+       doubled"): ONE table, one header row. It opens showing the down payment
+       and the FIRST 3 YEARS; every later payment is further down the SAME
+       table, which scrolls inside itself with its header pinned. (Build 81
+       split it into two cards, each with its own header: it read as two
+       tables.) A plan of 3 years or less (or cash) never scrolls. */
+    var FIRST_YEARS = 3;
+    function table(s) {
+      var wrap = el('div', 'q-sched-wrap');
+      var yearly = {};
+      s.rows.forEach(function (r) {
+        if (r.kind === 'instalment') { var y = Math.ceil(r.months / 12); yearly[y] = (yearly[y] || 0) + r.amount; }
+      });
+      var later = s.rows.filter(function (r) { return r.months > FIRST_YEARS * 12; });
+      if (!later.length) { wrap.appendChild(sheet(s.rows, yearly, s, 'q-sched')); return wrap; }
+
+      var lastY = Math.ceil(later[later.length - 1].months / 12);
+      var box = sheet(s.rows, yearly, s, 'q-sched q-sched-scroll');
+      box.setAttribute('tabindex', '0');                  /* scrollable by keyboard too */
+      box.setAttribute('role', 'region');
+      box.setAttribute('aria-label', t('Payment schedule'));
+      wrap.appendChild(box);
+      wrap.appendChild(el('p', 'q-sched-hint', t('Year ') + (FIRST_YEARS + 1) + t(' to Year ') + lastY + ' · ' +
+        later.length + (later.length === 1 ? t(' more payment') : t(' more payments')) + t(' · scroll the table')));
+      /* the box ends exactly where Year 4 starts, once it is on screen */
+      requestAnimationFrame(function () { fitSched(box); });
+      return wrap;
+    }
+    function fitSched(box) {
+      var first = [].filter.call(box.querySelectorAll('tbody tr'), function (tr) { return Number(tr.dataset.m) > FIRST_YEARS * 12; })[0];
+      if (!first || !box.offsetHeight) return;            /* hidden: keep the CSS height */
+      var top = first.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+      box.style.maxHeight = Math.round(top) + 'px';
+    }
+    window.addEventListener('resize', function () {
+      [].forEach.call(document.querySelectorAll('.q-sched-scroll'), function (b) { b.style.maxHeight = ''; fitSched(b); });
+    });
+    /* one card of rows, with its own header */
+    function sheet(rows, yearly, s, cls) {
+      var box = el('div', cls);
+      var tb = el('table');
+      var hr = el('tr');
+      ['Year', 'Instalment', 'Date', 'Amount (EGP)', '%', 'Yearly %'].forEach(function (h) { hr.appendChild(el('th', null, t(h))); });
+      var thead = el('thead'); thead.appendChild(hr); tb.appendChild(thead);
+      var body = el('tbody');
+      var seenYear = {};
+      rows.forEach(function (r) {
+        var tr = el('tr');
+        if (r.kind === 'down') {
+          if (!r.amount) return;                       /* 0% down: no row */
+          tr.className = 'is-dp';
+          tr.appendChild(el('td', null, 'DP'));
+          tr.appendChild(el('td', null, t('Down payment')));
+          tr.appendChild(el('td', null, day(r.due)));
+          tr.appendChild(el('td', 'num', money(r.amount)));
+          tr.appendChild(el('td', 'num', pct(r.amount / s.payable, 2)));
+          tr.appendChild(el('td', 'num', pct(r.amount / s.payable, 2)));
+        } else {
+          var y = Math.ceil(r.months / 12), first = !seenYear[y];
+          seenYear[y] = true;
+          if (first) tr.className = 'is-year';
+          tr.appendChild(el('td', null, first ? t('Year ') + y : ''));
+          tr.appendChild(el('td', null, t('Inst. ') + r.no));
+          tr.appendChild(el('td', null, day(r.due)));
+          tr.appendChild(el('td', 'num', money(r.amount)));
+          tr.appendChild(el('td', 'num', pct(r.amount / s.payable, 2)));
+          tr.appendChild(el('td', 'num', first ? pct(yearly[y] / s.payable, 2) : ''));
+        }
+        tr.dataset.m = r.months;
+        body.appendChild(tr);
+      });
+      tb.appendChild(body);
+      box.appendChild(tb);
+      return box;
+    }
+
+    load();
+  }
+
+  MM.lineFlow = lineFlow;
+  MM.lineFlow.floorId = floorId;
+}(typeof window !== 'undefined' ? window : globalThis));

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Main Marks — Sign in</title>
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css?v=82">
+</head>
+<body class="is-login">
+
+<main class="gate">
+
+  <!-- the picture, with the brand lockup over it -->
+  <div class="gate-art">
+    <img src="img/mm-hero-steps.jpg" alt="" aria-hidden="true">
+    <span class="gate-sweep" aria-hidden="true"></span>
+    <div class="gate-lockup" data-in="1">
+      <img src="img/mainmarks-wordmark.svg" alt="Main Marks" class="logo-jpg gate-mark">
+      <span class="gate-sub">Projects</span>
+    </div>
+  </div>
+
+  <!-- the form -->
+  <div class="gate-body">
+
+    <h1 class="gate-head" data-in="2">Your next chapter<br>starts with<br>Main&nbsp;Marks<span class="dot" id="dot">.</span></h1>
+
+    <form class="gate-form" id="signin" autocomplete="on" novalidate>
+
+      <label class="field" data-in="3">
+        <span>Work email</span>
+        <input id="who" name="username" type="email" inputmode="email"
+               autocomplete="username" autocapitalize="off" spellcheck="false" required>
+      </label>
+
+      <label class="field" data-in="4">
+        <span>Password</span>
+        <input id="code" name="password" type="password" autocomplete="current-password" required>
+      </label>
+
+      <p class="gate-err" id="why" hidden></p>
+
+      <button class="signin-btn" id="go" data-in="5" type="submit">
+        <span>Sign in</span>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
+                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="btn-state" aria-hidden="true">
+          <span class="spin"></span>
+          <svg class="tick" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </span>
+      </button>
+
+      <button class="forgot" id="forgot" type="button">Forgot password?</button>
+      <p class="forgot-note" id="forgotnote" hidden></p>
+
+      <div class="demo-note" id="demonote" hidden>
+        <p><strong>Demo accounts.</strong> Main Marks has not sent the sales team yet, so these stand in. Tap one to fill the form.</p>
+      </div>
+
+    </form>
+
+    <footer class="gate-foot" data-in="6">
+      <div class="marks"><img src="img/mainmarks-signature.svg" alt="Main Marks"></div>
+      <div class="gate-priv">
+        <span>Privileged access to</span>
+        <span>Main Marks projects</span>
+        <span id="buildstamp"></span>
+      </div>
+    </footer>
+
+  </div>
+
+</main>
+
+<!-- ACCESS GRANTED. The same block is in projects.html, so the page that
+     leaves and the page that arrives are painting identical markup and
+     cannot drift apart. Hidden until it is played. -->
+<div class="xfade" id="xfade" aria-hidden="true">
+  <span class="xf-line xf-l1 from-l"></span>
+  <span class="xf-line xf-l2 from-r"></span>
+  <span class="xf-line xf-l3 from-l"></span>
+  <span class="xf-line xf-l4 from-r"></span>
+  <div class="xf-copy">
+    <p class="xf-granted">Access granted</p>
+    <p class="xf-select">Select a project</p>
+    <span class="xf-rule"></span>
+  </div>
+</div>
+
+<script src="js/config.js?v=82"></script>
+<script src="js/brand.js?v=82"></script>
+<script src="js/auth.js?v=82"></script>
+<script src="js/login.js?v=82"></script>
+</body>
+</html>

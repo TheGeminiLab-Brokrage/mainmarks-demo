@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Main Marks App Demo</title>
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300..700&display=swap" rel="stylesheet">
+<!-- ------------------------------------------------------------------
+     The demo in a phone. The REAL app runs inside the frame (an iframe of
+     this same folder), at an iPhone's 390 px, so every media query, tap
+     and animation is the one a salesperson's phone gets. The frame is
+     scaled to fit the window; the app inside is never resized.
+     On a phone, the frame is dropped and the app fills the screen.
+     ------------------------------------------------------------------ -->
+<style>
+  :root {
+    --ink: #000; --white: #fff; --muted: #8B8989; --orange: #F7951E;
+    --edge: rgba(255, 255, 255, .13);
+    --screen-w: 390px; --screen-h: 844px; --bezel: 13px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--ink); color: var(--white);
+    font-family: 'Manrope', system-ui, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; gap: 56px; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 40%, #17171a 0%, #000 70%); }
+
+  /* ---- the words beside the phone ---- */
+  .side { width: 300px; display: flex; flex-direction: column; gap: 22px; }
+  .side img.mm { width: 210px; height: auto; display: block; }
+  .eyebrow { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+  .side h1 { margin: 0; font-size: 26px; font-weight: 300; line-height: 1.25; }
+  .side h1 b { font-weight: 600; }
+  .side p { margin: 0; font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .72); }
+  .creds { padding: 14px 16px; border: 1px solid var(--edge); border-radius: 12px; font-size: 13px; line-height: 1.7;
+    background: rgba(255, 255, 255, .04); }
+  .creds span { color: var(--muted); }
+  .creds b { font-weight: 600; }
+  .btns { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { font: inherit; font-size: 13px; font-weight: 600; color: var(--white); cursor: pointer; text-decoration: none;
+    padding: 10px 16px; border-radius: 10px; background: rgba(255, 255, 255, .06); border: 1px solid var(--edge); }
+  .btn:hover { border-color: rgba(255, 255, 255, .3); }
+  .btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+  .foot { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+
+  /* ---- the phone ---- */
+  .stage { flex: none; }
+  .phone {
+    position: relative;
+    width: calc(var(--screen-w) + 2 * var(--bezel));
+    height: calc(var(--screen-h) + 2 * var(--bezel));
+    padding: var(--bezel); border-radius: 64px;
+    background: #0c0c0e;
+    box-shadow: 0 0 0 2px #2b2b30, 0 0 0 5px #111114, 0 40px 90px rgba(0, 0, 0, .7), inset 0 0 0 1px #000;
+    transform-origin: 50% 50%;
+  }
+  /* the side buttons */
+  .phone::before, .phone::after { content: ''; position: absolute; width: 4px; border-radius: 2px; background: #26262b; }
+  .phone::before { left: -7px; top: 190px; height: 64px; box-shadow: 0 84px 0 #26262b; }
+  .phone::after { right: -7px; top: 250px; height: 98px; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 51px; overflow: hidden; background: #000;
+    display: flex; flex-direction: column; }
+  .status { flex: none; height: 50px; display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 32px 0 40px; font-size: 15px; font-weight: 600; color: #fff; }
+  .status svg { display: block; }
+  .status { position: relative; z-index: 3; }
+  .screen.locked .status > span:first-child { visibility: hidden; }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 122px; height: 35px;
+    border-radius: 20px; background: #000; z-index: 3; }
+  iframe { flex: 1 1 auto; width: 100%; border: 0; display: block; background: #000; }
+  .home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px;
+    border-radius: 3px; background: rgba(255, 255, 255, .85); z-index: 3; pointer-events: none; }
+
+  /* ---- the lock screen: the demo starts with a broker's message ---- */
+  .lock { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center;
+    padding-top: 92px; cursor: default;
+    background: radial-gradient(ellipse 90% 60% at 50% 72%, #1b1b1f 0%, #000 72%);
+    transition: transform .55s cubic-bezier(.6, 0, .3, 1), opacity .55s ease; }
+  /* the wallpaper: the Main Marks emblem and wordmark, low on the screen */
+  .lock .wall { position: absolute; left: 0; right: 0; bottom: 112px; display: flex; flex-direction: column;
+    align-items: center; gap: 24px; pointer-events: none; }
+  .lock .wall .em { height: 132px; width: auto; opacity: .92; }
+  .lock .wall .wm { width: 196px; height: auto; }
+  .lock.away { transform: translateY(-100%); opacity: .4; pointer-events: none; }
+  .lock.gone { display: none; }
+  .lock .lk { width: 14px; height: 18px; opacity: .9; }
+  .lock .date { margin-top: 10px; font-size: 19px; font-weight: 500; letter-spacing: .01em; color: rgba(255,255,255,.92); }
+  .lock .time { font-size: 92px; font-weight: 300; line-height: 1; letter-spacing: -.02em; margin-top: 2px;
+    text-shadow: 0 2px 30px rgba(0,0,0,.35); }
+  .lock .hint { position: absolute; bottom: 40px; left: 0; right: 0; text-align: center; font-size: 13px; font-weight: 500;
+    color: rgba(255,255,255,.8); opacity: 0; transition: opacity .4s ease; }
+  .lock.ringing .hint { opacity: 1; animation: hintPulse 2.2s ease-in-out infinite; }
+  @keyframes hintPulse { 50% { opacity: .45; } }
+
+  .note { position: absolute; top: 300px; left: 10px; right: 10px; z-index: 3; display: flex; gap: 11px; align-items: flex-start;
+    padding: 12px 14px 13px; border-radius: 22px; text-align: left; font: inherit; color: #fff; cursor: pointer;
+    background: rgba(40, 40, 44, .62); border: 1px solid rgba(255,255,255,.1);
+    -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    transform: translateY(46px) scale(.96); opacity: 0; }
+  .lock.ringing .note { animation: noteIn .62s cubic-bezier(.2, 1.25, .4, 1) forwards, buzz .42s ease-in-out .7s 2; }
+  .note:active { transform: scale(.97); }
+  .note:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+  @keyframes noteIn { from { transform: translateY(46px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes buzz { 0%, 100% { translate: 0; } 20% { translate: -3px; } 40% { translate: 3px; } 60% { translate: -2px; } 80% { translate: 2px; } }
+  .note .ic { flex: none; width: 38px; height: 38px; border-radius: 10px; background: #25D366; display: grid; place-items: center; }
+  .note .tx { flex: 1; min-width: 0; }
+  .note .hd { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; }
+  .note .hd span { font-weight: 500; color: rgba(255,255,255,.6); }
+  .note .bd { margin-top: 2px; font-size: 14px; line-height: 1.38; color: rgba(255,255,255,.92); }
+
+  /* the request, kept beside the phone once it has been opened */
+  .req { padding: 14px 16px; border-radius: 12px; font-size: 13px; line-height: 1.6;
+    border: 1px solid rgba(37, 211, 102, .35); background: rgba(37, 211, 102, .07); }
+  .req span { display: block; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #25D366; margin-bottom: 4px; }
+  .req[hidden] { display: none; }
+
+  /* ---- on a phone, the app IS the screen ---- */
+  @media (max-width: 760px) {
+    body { display: block; background: #000; }
+    .side { display: none; }
+    .phone { width: 100vw; height: 100dvh; padding: 0; border-radius: 0; box-shadow: none; background: #000; transform: none !important; }
+    .phone::before, .phone::after, .status, .island, .home { display: none; }
+    .screen { border-radius: 0; }
+    .lock { padding-top: 70px; }
+    .note { top: 270px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lock.ringing .note { animation: none; transform: none; opacity: 1; }
+    .lock.ringing .hint { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<section class="side" aria-label="About this demo">
+  <img class="mm" src="img/mainmarks-wordmark.svg" alt="Main Marks">
+  <p class="eyebrow">The Main Marks app · Moray</p>
+  <h1>From a broker’s question to <b>an offer on WhatsApp</b>, on the salesperson’s phone.</h1>
+  <p>This is the real app, running inside the phone. A broker has just sent a request. Tap the message, then answer it from the app: choose Moray, open Wellness, find the unit, and open its payment plan.</p>
+  <div class="req" id="req" hidden>
+    <span>The request</span>
+    Sara Adel, broker: a cardiologist wants the lowest-priced clinic at Moray Wellness, on the first floor only (his patients have heart problems).
+  </div>
+  <div class="creds">
+    <span>Demo sign-in</span><br>
+    Email <b>sales@demo.local</b><br>
+    Password <b>1111</b>
+  </div>
+  <div class="btns">
+    <button class="btn" type="button" id="restart">Start again</button>
+    <button class="btn" type="button" id="moray">Go to Moray</button>
+  </div>
+  <p class="foot" id="build">Demo · Main Marks Development</p>
+</section>
+
+<div class="stage">
+  <div class="phone" id="phone">
+    <div class="screen" id="screen">
+      <div class="island" aria-hidden="true"></div>
+      <div class="status" aria-hidden="true">
+        <span>9:41</span>
+        <span style="display:flex;gap:6px;align-items:center">
+          <svg width="18" height="12" viewBox="0 0 18 12" fill="#fff"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M1.5 4.2a9.5 9.5 0 0 1 13 0"/><path d="M4 7a6 6 0 0 1 8 0"/><circle cx="8" cy="10" r="1" fill="#fff" stroke="none"/></svg>
+          <svg width="27" height="13" viewBox="0 0 27 13" fill="none"><rect x=".5" y=".5" width="23" height="12" rx="3.5" stroke="rgba(255,255,255,.5)"/><rect x="2" y="2" width="20" height="9" rx="2" fill="#fff"/><rect x="25" y="4.5" width="1.6" height="4" rx=".8" fill="rgba(255,255,255,.5)"/></svg>
+        </span>
+      </div>
+      <iframe id="app" src="about:blank" title="The Main Marks app"></iframe>
+      <div class="lock" id="lock">
+        <svg class="lk" viewBox="0 0 14 18" fill="none" stroke="#fff" stroke-width="1.8" aria-hidden="true"><rect x="1" y="8" width="12" height="9" rx="2.2" fill="#fff" stroke="none"/><path d="M3.6 8V5.4a3.4 3.4 0 0 1 6.8 0V8"/></svg>
+        <div class="date" id="date">Thursday 1 October</div>
+        <div class="time">9:41</div>
+        <button class="note" id="note" type="button" aria-label="New WhatsApp message from Sara Adel, broker. Open it.">
+          <span class="ic" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.8l4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm0 2a7.8 7.8 0 1 1-4 14.5l-.3-.2-2.8.8.8-2.7-.2-.3A7.8 7.8 0 0 1 12 4.2Z"/></svg>
+          </span>
+          <span class="tx">
+            <span class="hd">Sara Adel · Broker <span>now</span></span>
+            <span class="bd" style="display:block">Hi! My client is a cardiologist. His patients usually have heart problems, so he won’t accept anything higher than the first floor. What’s your lowest-priced first-floor clinic at Moray Wellness?</span>
+          </span>
+        </button>
+        <div class="wall" aria-hidden="true">
+          <img class="em" src="img/mainmarks-emblem.svg" alt="">
+          <img class="wm" src="img/mainmarks-wordmark.svg" alt="">
+        </div>
+        <div class="hint">Tap the message to answer it</div>
+      </div>
+      <div class="home" aria-hidden="true"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var phone = document.getElementById('phone');
+  var app = document.getElementById('app');
+
+  /* fit the whole phone in the window; the app inside keeps its 390 px */
+  function fit() {
+    if (window.matchMedia('(max-width: 760px)').matches) { phone.style.transform = ''; return; }
+    var h = phone.offsetHeight, w = phone.offsetWidth;
+    var s = Math.min(1, (window.innerHeight - 48) / h, (window.innerWidth - 380) / w);
+    phone.style.transform = 'scale(' + Math.max(0.5, s).toFixed(3) + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* a phone has no scrollbar: hide the desktop one inside the frame, or it
+     takes 15 px off the app's width and the app lays out for 375 px */
+  app.addEventListener('load', function () {
+    try {
+      var d = app.contentDocument;
+      var st = d.createElement('style');
+      st.textContent = 'html{scrollbar-width:none}::-webkit-scrollbar{display:none;width:0;height:0}';
+      d.head.appendChild(st);
+    } catch (e) { /* not the same origin: leave it */ }
+  });
+
+  /* ---- the opening: a locked phone, then the broker's message ----------
+     The app is not loaded until the message is tapped, so its own sign-in
+     or entry animation plays in front of the viewer, not behind the lock. */
+  var lock = document.getElementById('lock');
+  var note = document.getElementById('note');
+  var req = document.getElementById('req');
+  var screen = document.getElementById('screen');
+  var ringTimer = null;
+
+  try {
+    document.getElementById('date').textContent =
+      new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  } catch (e) { /* keep the written date */ }
+
+  function ring() {
+    clearTimeout(ringTimer);
+    app.src = 'about:blank';
+    req.hidden = true;
+    lock.classList.remove('away', 'gone', 'ringing');
+    screen.classList.add('locked');
+    void lock.offsetWidth;                       /* restart the slide-in */
+    ringTimer = setTimeout(function () { lock.classList.add('ringing'); }, 1400);
+  }
+
+  function answer() {
+    if (lock.classList.contains('away')) return;
+    var done = false;
+    function unlock() {
+      if (done) return;
+      done = true;
+      lock.classList.add('away');
+      screen.classList.remove('locked');
+      req.hidden = false;
+      setTimeout(function () { lock.classList.add('gone'); }, 600);
+    }
+    app.addEventListener('load', function onLoad() {
+      if (app.src.indexOf('about:blank') !== -1) return;
+      app.removeEventListener('load', onLoad);
+      unlock();
+    });
+    app.src = 'projects.html';                      /* signed out: the app sends it to sign-in */
+    setTimeout(unlock, 1500);                    /* never leave the viewer on the lock */
+  }
+
+  note.addEventListener('click', answer);
+  ring();
+
+  document.getElementById('restart').addEventListener('click', ring);
+  document.getElementById('moray').addEventListener('click', function () {
+    clearTimeout(ringTimer);
+    lock.classList.add('away', 'gone');
+    screen.classList.remove('locked');
+    req.hidden = false;
+    app.src = 'project.html?p=moray';
+  });
+
+  try {
+    if (window.CONFIG && CONFIG.build) document.getElementById('build').textContent = 'Demo · build ' + CONFIG.build;
+  } catch (e) { /* no config: keep the plain line */ }
+}());
+</script>
+</body>
+</html>
