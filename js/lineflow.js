@@ -35,6 +35,11 @@
   /* the sheet's floor words -> one id ("S.Level", "Street level", "1st", "First") */
   /* one rule for the sheet's floor word, shared with the offer PDF */
   function floorId(raw) { return MM.inventory.floorId(raw); }
+  /* the demo page around the app (demo.html), if there is one */
+  function demoPhone() {
+    try { var d = root.parent !== root && root.parent.MMDemo; return d && typeof d.share === 'function' ? d : null; }
+    catch (e) { return null; }             /* another origin's frame: not the demo */
+  }
   function money(v) { return Math.round(v).toLocaleString('en-US'); }
   function day(d) { return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
   function pct(f, dp) { return (Math.round(f * Math.pow(10, 2 + (dp || 0))) / Math.pow(10, dp || 0)) + '%'; }
@@ -840,6 +845,21 @@
          a popup opened later is blocked silently (playbook 01, 4b) */
       send.addEventListener('click', function () {
         if (!current) return;
+        /* build 83: inside the demo's phone (demo.html), the PHONE answers:
+           its share sheet slides up, a WhatsApp chat is chosen and the offer
+           PDF goes with the text. Only there; a real phone still goes
+           straight to WhatsApp with the text, as before. */
+        var demo = demoPhone();
+        if (demo) {
+          var c = current;
+          demo.share({
+            text: offerText(), agent: session.name || '', unit: c.u.code,
+            pdf: MM.offerPdf && MM.offerPdf.can(p, c.u) ? function () {
+              return MM.offerPdf.make({ project: p, unit: c.u, plan: c.pl, buildingName: c.b && c.b.name, buildingRows: c.b && c.b.rows });
+            } : null
+          });
+          return;
+        }
         window.open('https://wa.me/?text=' + encodeURIComponent(offerText()), '_blank', 'noopener');
       });
       copy.addEventListener('click', function () {

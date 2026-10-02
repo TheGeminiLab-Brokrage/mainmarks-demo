@@ -118,8 +118,134 @@
   .req span { display: block; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #25D366; margin-bottom: 4px; }
   .req[hidden] { display: none; }
 
+  /* ==================================================================
+     THE PHONE'S OWN SCREENS (build 83). "Send offer on WhatsApp" in the
+     app calls MMDemo.share(): the iOS share sheet slides up from the
+     bottom, a WhatsApp chat is chosen, WhatsApp shows the offer PDF before
+     sending, and the chat shows it sent. These are the phone, not the app,
+     so they live here, over the app's frame. Dark, as the lock screen.
+     ================================================================== */
+  .screen { --sb: 50px; }                         /* the status bar's height */
+  .os { position: absolute; inset: 0; z-index: 2; display: none; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Manrope', system-ui, sans-serif; }
+  .os.on { display: block; }
+  .os-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .35s ease; }
+  .os.up .os-dim { opacity: 1; }
+
+  /* the share sheet */
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; height: min(570px, calc(100% - var(--sb) - 20px));
+    background: #1c1c1e; border-radius: 14px 14px 0 0; color: #fff; display: flex; flex-direction: column;
+    transform: translateY(100%); transition: transform .5s cubic-bezier(.32, .72, 0, 1); }
+  .os.up .sheet { transform: none; }
+  .sheet .grab { flex: none; width: 36px; height: 5px; border-radius: 3px; background: #48484a; margin: 6px auto 0; }
+  .sh-head { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 16px 14px; border-bottom: .5px solid #38383a; }
+  .sh-thumb { flex: none; width: 42px; height: 56px; border-radius: 5px; background: #fff center top / cover no-repeat;
+    box-shadow: 0 0 0 .5px rgba(255,255,255,.15); display: grid; place-items: center; }
+  .sh-thumb.is-text { background: #25D366; }
+  .sh-thumb .spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #c7c7cc; border-top-color: transparent;
+    animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sh-title { flex: 1; min-width: 0; }
+  .sh-title b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    font-size: 15px; font-weight: 600; line-height: 1.25; }
+  .sh-title span { display: block; margin-top: 2px; font-size: 13px; color: #8e8e93; }
+  .sh-x { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0; background: #3a3a3c; color: #c7c7cc;
+    font-size: 15px; line-height: 30px; cursor: pointer; }
+  .sh-body { flex: 1; overflow-y: auto; padding-bottom: 30px; }
+  .sh-row { display: flex; gap: 6px; overflow-x: auto; padding: 16px 12px 14px; scrollbar-width: none; }
+  .sh-row::-webkit-scrollbar { display: none; }
+  .sh-row + .sh-row { border-top: .5px solid #38383a; }
+  .who, .app2 { flex: none; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    background: none; border: 0; color: #fff; font: inherit; cursor: pointer; padding: 0; }
+  .who .av { position: relative; width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 22px; font-weight: 600; color: #fff; }
+  .who .av i { position: absolute; right: -2px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%; background: #25D366;
+    border: 2px solid #1c1c1e; display: grid; place-items: center; }
+  .who .nm, .app2 .nm { font-size: 11.5px; line-height: 1.25; text-align: center; }
+  .who .nm small { display: block; color: #8e8e93; font-size: 11px; }
+  .who.asked .av { box-shadow: 0 0 0 2.5px #1c1c1e, 0 0 0 4.5px #25D366; }
+  .app2 .ic2 { width: 62px; height: 62px; border-radius: 15px; display: grid; place-items: center; }
+  .who:active .av, .app2:active .ic2 { filter: brightness(.8); }
+  .sh-acts { margin: 6px 16px 0; border-radius: 12px; background: #2c2c2e; overflow: hidden; }
+  .sh-acts button { display: flex; width: 100%; justify-content: space-between; align-items: center; padding: 13px 16px;
+    background: none; border: 0; color: #fff; font: inherit; font-size: 16px; cursor: pointer; text-align: left; }
+  .sh-acts button + button { border-top: .5px solid #3a3a3c; }
+  .sh-acts button span { color: #c7c7cc; font-size: 17px; }
+  /* a phone has no scrollbars (the app's frame hides its own the same way) */
+  .os .pages, .os .chat, .os .sh-body, .os .wa-list { scrollbar-width: none; }
+  .os .pages::-webkit-scrollbar, .os .chat::-webkit-scrollbar, .os .sh-body::-webkit-scrollbar,
+  .os .wa-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .toast { position: absolute; left: 50%; bottom: 46px; transform: translate(-50%, 12px); opacity: 0; z-index: 5;
+    padding: 9px 14px; border-radius: 18px; background: rgba(60, 60, 64, .96); color: #fff; font-size: 13px;
+    white-space: nowrap; transition: opacity .25s ease, transform .25s ease; pointer-events: none; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  /* WhatsApp: the screens a share into it shows (dark theme) */
+  .wa { position: absolute; inset: 0; background: #0b141a; color: #e9edef; display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform .38s cubic-bezier(.32, .72, 0, 1); }
+  .wa.in { transform: none; }
+  .wa.from-bottom { transform: translateY(100%); }
+  .wa.from-bottom.in { transform: none; }
+  .wa-top { flex: none; display: flex; align-items: center; gap: 10px; padding: calc(var(--sb) + 6px) 12px 10px;
+    background: #1f2c34; }
+  .wa-top button { background: none; border: 0; color: #00a884; font: inherit; font-size: 16px; cursor: pointer; padding: 4px; }
+  .wa-top .av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 600; color: #fff; flex: none; }
+  .wa-top .tt { flex: 1; min-width: 0; }
+  .wa-top .tt b { display: block; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wa-top .tt span { display: block; font-size: 12px; color: #8696a0; }
+  .wa-top.center .tt { text-align: center; }
+  .wa-list { flex: 1; overflow-y: auto; }
+  .wa-list h6 { margin: 14px 16px 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #8696a0; }
+  .wa-list button { display: flex; width: 100%; align-items: center; gap: 12px; padding: 9px 16px; background: none; border: 0;
+    color: #e9edef; font: inherit; text-align: left; cursor: pointer; }
+  .wa-list button .av { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; color: #fff; flex: none; }
+  .wa-list button b { display: block; font-size: 16px; font-weight: 500; }
+  .wa-list button span { display: block; font-size: 13px; color: #8696a0; }
+  .wa-list button:active { background: #202c33; }
+
+  /* the document before it is sent, and the viewer */
+  .pages { flex: 1; overflow-y: auto; padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px;
+    overscroll-behavior: contain; background: #0b141a; }
+  .pages img, .pages canvas { display: block; width: 100%; height: auto; background: #fff; border-radius: 2px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .5); }
+  .pages .wait { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; color: #8696a0; font-size: 13px; }
+  .pages .wait .spin { width: 26px; height: 26px; border-color: #8696a0; border-top-color: transparent; }
+  .pages .fail { margin: auto; padding: 0 20px; text-align: center; color: #f15c6d; font-size: 13px; line-height: 1.5; }
+  .pg-count { position: absolute; top: calc(var(--sb) + 64px); left: 50%; transform: translateX(-50%); padding: 3px 10px;
+    border-radius: 10px; background: rgba(0, 0, 0, .6); font-size: 12px; color: #fff; pointer-events: none; }
+  .wa-cap { flex: none; display: flex; align-items: flex-end; gap: 10px; padding: 10px 12px 30px; background: #0b141a; }
+  .wa-cap .cap { flex: 1; min-width: 0; max-height: 64px; overflow: hidden; padding: 9px 14px; border-radius: 20px; background: #1f2c34;
+    font-size: 13px; line-height: 1.35; color: #d1d7db; white-space: pre-line; }
+  .wa-send { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 0; background: #00a884; display: grid; place-items: center; cursor: pointer; }
+  .wa-send:disabled { opacity: .45; cursor: default; }
+
+  /* the chat */
+  .chat { flex: 1; overflow-y: auto; padding: 10px 10px 14px; display: flex; flex-direction: column; gap: 6px;
+    background-color: #0b141a;
+    background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.2px); background-size: 18px 18px; }
+  .chat .day { align-self: center; margin: 4px 0 6px; padding: 4px 10px; border-radius: 8px; background: #182229; font-size: 11.5px; color: #8696a0; }
+  .bub { max-width: 82%; padding: 6px 8px 5px 9px; border-radius: 8px; font-size: 14px; line-height: 1.38; position: relative; }
+  .bub.in { align-self: flex-start; background: #1f2c34; border-top-left-radius: 0; }
+  .bub.out { align-self: flex-end; background: #005c4b; border-top-right-radius: 0; }
+  .bub .tm { float: right; margin: 6px 0 -3px 10px; font-size: 11px; color: rgba(233, 237, 239, .6); display: inline-flex; align-items: center; gap: 3px; }
+  .bub .tk path { stroke: #8696a0; transition: stroke .4s ease; }
+  .bub .tk.read path { stroke: #53bdeb; }
+  .bub.doc { padding: 4px; width: 82%; cursor: pointer; }
+  .bub.doc .pv { height: 150px; border-radius: 6px 6px 0 0; background: #fff center top / cover no-repeat; }
+  .bub.doc .row { display: flex; align-items: center; gap: 10px; padding: 9px 8px; background: #025144; border-radius: 0 0 6px 6px; }
+  .bub.doc .row .pdf { flex: none; width: 30px; height: 36px; border-radius: 3px; background: #e2483d; color: #fff;
+    font-size: 9px; font-weight: 700; display: grid; place-items: end center; padding-bottom: 5px; }
+  .bub.doc .row b { display: block; font-size: 13.5px; font-weight: 500; line-height: 1.3; word-break: break-word; }
+  .bub.doc .row span { display: block; font-size: 12px; color: rgba(233, 237, 239, .6); margin-top: 2px; }
+  .bub.doc .tm { float: none; display: flex; justify-content: flex-end; margin: 2px 4px 0; }
+  .bub.pop { animation: pop .3s cubic-bezier(.2, 1.2, .4, 1) both; }
+  @keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.97); } }
+  .wa-bar { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 10px 30px; background: #1f2c34; }
+  .wa-bar span { flex: 1; padding: 8px 14px; border-radius: 18px; background: #2a3942; color: #8696a0; font-size: 14px; }
+
   /* ---- on a phone, the app IS the screen ---- */
   @media (max-width: 760px) {
+    .screen { --sb: env(safe-area-inset-top, 0px); }
     body { display: block; background: #000; }
     .side { display: none; }
     .phone { width: 100vw; height: 100dvh; padding: 0; border-radius: 0; box-shadow: none; background: #000; transform: none !important; }
@@ -140,7 +266,7 @@
   <img class="mm" src="img/mainmarks-wordmark.svg" alt="Main Marks">
   <p class="eyebrow">The Main Marks app · Moray</p>
   <h1>From a broker’s question to <b>an offer on WhatsApp</b>, on the salesperson’s phone.</h1>
-  <p>This is the real app, running inside the phone. A broker has just sent a request. Tap the message, then answer it from the app: choose Moray, open Wellness, find the unit, and open its payment plan.</p>
+  <p>This is the real app, running inside the phone. A broker has just sent a request. Tap the message, then answer it from the app: choose Moray, open Wellness, find the unit, open its payment plan, and send the offer back on WhatsApp.</p>
   <div class="req" id="req" hidden>
     <span>The request</span>
     Sara Adel, broker: a cardiologist wants the lowest-priced clinic at Moray Wellness, on the first floor only (his patients have heart problems).
@@ -188,6 +314,54 @@
           <img class="wm" src="img/mainmarks-wordmark.svg" alt="">
         </div>
         <div class="hint">Tap the message to answer it</div>
+      </div>
+
+      <!-- the phone's own screens (build 83): share sheet -> WhatsApp -->
+      <div class="os" id="os" aria-hidden="true">
+        <div class="os-dim" id="osDim"></div>
+        <div class="sheet" id="sheet" role="dialog" aria-label="Share">
+          <div class="grab"></div>
+          <div class="sh-head">
+            <div class="sh-thumb" id="shThumb"><span class="spin"></span></div>
+            <div class="sh-title"><b id="shName">Offer</b><span id="shMeta">Preparing the offer PDF…</span></div>
+            <button class="sh-x" type="button" id="shClose" aria-label="Close">✕</button>
+          </div>
+          <div class="sh-body">
+            <div class="sh-row" id="shPeople"></div>
+            <div class="sh-row" id="shApps"></div>
+            <div class="sh-acts">
+              <button type="button" data-act="copy">Copy <span>⧉</span></button>
+              <button type="button" data-act="files">Save to Files <span>▭</span></button>
+              <button type="button" data-act="print">Print <span>⎙</span></button>
+            </div>
+          </div>
+        </div>
+        <section class="wa from-bottom" id="waPick" aria-label="WhatsApp: send to">
+          <div class="wa-top center"><button type="button" data-back="pick">Cancel</button>
+            <div class="tt"><b>Send to…</b></div><span style="width:52px"></span></div>
+          <div class="wa-list" id="waPickList"></div>
+        </section>
+        <section class="wa" id="waPrev" aria-label="WhatsApp: the document before sending">
+          <div class="wa-top"><button type="button" data-back="prev" aria-label="Cancel">✕</button>
+            <span class="av" id="prevAv"></span><div class="tt"><b id="prevName"></b><span id="prevSub">Document</span></div></div>
+          <div class="pages" id="prevPages"></div>
+          <span class="pg-count" id="prevCount" hidden></span>
+          <div class="wa-cap"><div class="cap" id="prevCap"></div>
+            <button class="wa-send" type="button" id="prevSend" aria-label="Send">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg></button></div>
+        </section>
+        <section class="wa" id="waChat" aria-label="WhatsApp chat">
+          <div class="wa-top"><button type="button" data-back="chat" aria-label="Back to the app">‹ Back</button>
+            <span class="av" id="chatAv"></span><div class="tt"><b id="chatName"></b><span id="chatSub">online</span></div></div>
+          <div class="chat" id="chat"></div>
+          <div class="wa-bar"><span>Message</span></div>
+        </section>
+        <section class="wa from-bottom" id="waView" aria-label="The offer PDF">
+          <div class="wa-top"><button type="button" data-back="view">Done</button>
+            <div class="tt"><b id="viewName"></b><span id="viewSub"></span></div></div>
+          <div class="pages" id="viewPages"></div>
+        </section>
+        <div class="toast" id="toast"></div>
       </div>
       <div class="home" aria-hidden="true"></div>
     </div>
@@ -237,6 +411,7 @@
 
   function ring() {
     clearTimeout(ringTimer);
+    closeAll(true); job = null;
     app.src = 'about:blank';
     req.hidden = true;
     lock.classList.remove('away', 'gone', 'ringing');
@@ -265,12 +440,264 @@
     setTimeout(unlock, 1500);                    /* never leave the viewer on the lock */
   }
 
+  /* ==================================================================
+     THE SHARE SHEET AND WHATSAPP (build 83). The app's "Send offer on
+     WhatsApp" calls MMDemo.share({ text, agent, unit, pdf }) from inside
+     the frame; `pdf` makes the real offer PDF (js/offerpdf.js -> js/pdf.js)
+     or is null for a unit the offer does not cover yet (then the text goes
+     alone). The contacts are invented, like Sara Adel.
+     ================================================================== */
+  function $(id) { return document.getElementById(id); }
+  var os = $('os');
+  var REQUEST = document.querySelector('#note .bd').textContent;
+  var PEOPLE = [
+    { name: 'Sara Adel', sub: 'Broker', bg: '#7b5ea7', asked: true },
+    { name: 'Omar Fathy', sub: 'Broker', bg: '#2f7d6d' },
+    { name: 'Moray Sales', sub: 'Team group', bg: '#b5651d' },
+    { name: 'Yasmin Nabil', sub: 'Broker', bg: '#3b6fb6' }
+  ];
+  var WA_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#fff"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.8l4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm0 2a7.8 7.8 0 1 1-4 14.5l-.3-.2-2.8.8.8-2.7-.2-.3A7.8 7.8 0 0 1 12 4.2Z"/></svg>';
+  var TICKS = '<svg class="tk" width="17" height="11" viewBox="0 0 17 11" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6l3 3 6-7.5"/><path d="M7.5 8.6 8 9l6-7.5"/></svg>';
+  var job = null, timers = [];
+
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  /* WhatsApp's own formatting: *bold*, line breaks */
+  function waText(s) { return esc(s).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/\n/g, '<br>'); }
+  function initials(n) { return n.split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase(); }
+  function avatar(el, who) { el.textContent = initials(who.name); el.style.background = who.bg; }
+  function mb(bytes) { return bytes > 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' kB'; }
+  var toastT = null;
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('on');
+    clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove('on'); }, 1800);
+  }
+
+  var libs = {};
+  function load(src) {
+    if (!libs[src]) libs[src] = new Promise(function (ok, no) {
+      var s = document.createElement('script'); s.src = src; s.onload = ok;
+      s.onerror = function () { delete libs[src]; no(new Error('Could not load ' + src)); };
+      document.head.appendChild(s);
+    });
+    return libs[src];
+  }
+  /* every page of the PDF as a picture, with Mozilla's PDF.js, so it shows
+     the same on a laptop and on a phone (a phone's browser will not show a
+     PDF inside a page) */
+  function pagesOf(file) {
+    return Promise.all([load('vendor/pdfjs/pdf.min.js'), file.blob.arrayBuffer()]).then(function (r) {
+      var lib = window.pdfjsLib;
+      lib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.js';
+      return lib.getDocument({ data: new Uint8Array(r[1]) }).promise;
+    }).then(function (pdf) {
+      var out = [], n = 0;
+      function next() {
+        if (++n > pdf.numPages) return out;
+        return pdf.getPage(n).then(function (page) {
+          var v0 = page.getViewport({ scale: 1 }), v = page.getViewport({ scale: 760 / v0.width });
+          var c = document.createElement('canvas'); c.width = v.width; c.height = v.height;
+          return page.render({ canvasContext: c.getContext('2d'), viewport: v }).promise.then(function () {
+            out.push(c.toDataURL('image/jpeg', 0.86)); return next();
+          });
+        });
+      }
+      return next();
+    });
+  }
+
+  function fillPages(box, done) {
+    box.innerHTML = '<div class="wait"><span class="spin"></span>Preparing the offer…</div>';
+    if (!job.pages) { box.innerHTML = '<p class="fail">No PDF.</p>'; return; }
+    job.pages.then(function (urls) {
+      box.innerHTML = '';
+      urls.forEach(function (u, i) { var im = new Image(); im.src = u; im.alt = 'Page ' + (i + 1); box.appendChild(im); });
+      if (done) done(urls);
+    }, function (e) { box.innerHTML = '<p class="fail">The offer PDF could not be made.<br>' + esc(e && e.message || e) + '</p>'; });
+  }
+
+  function share(o) {
+    closeAll(true);
+    job = { text: o.text, unit: o.unit, agent: o.agent, to: null, file: null, pages: null };
+    var thumb = $('shThumb');
+    thumb.className = 'sh-thumb'; thumb.style.backgroundImage = ''; thumb.innerHTML = '<span class="spin"></span>';
+    if (o.pdf) {
+      $('shName').textContent = 'Moray Wellness · Clinic ' + o.unit + ' · offer';
+      $('shMeta').textContent = 'Preparing the offer PDF…';
+      job.file = Promise.resolve().then(o.pdf);
+      job.pages = job.file.then(pagesOf);
+      var mine = job;
+      job.file.then(function (f) {
+        if (job !== mine) return;
+        f.size = f.blob.size;
+        $('shName').textContent = f.name;
+        $('shMeta').textContent = 'PDF Document · ' + f.pages + ' pages · ' + mb(f.size);
+      }, function (e) {
+        if (job !== mine) return;
+        $('shMeta').textContent = 'No PDF: ' + (e && e.message || e);
+      });
+      job.pages.then(function (urls) {
+        if (job !== mine) return;
+        thumb.innerHTML = ''; thumb.style.backgroundImage = 'url(' + urls[0] + ')';
+      }, function () { if (job === mine) { thumb.className = 'sh-thumb is-text'; thumb.innerHTML = WA_ICON; } });
+    } else {
+      $('shName').textContent = 'Offer · ' + o.unit;
+      $('shMeta').textContent = 'Text · this unit has no offer PDF yet';
+      thumb.className = 'sh-thumb is-text'; thumb.innerHTML = WA_ICON;
+    }
+    os.classList.add('on'); os.setAttribute('aria-hidden', 'false');
+    void os.offsetWidth;
+    os.classList.add('up');
+  }
+  window.MMDemo = { share: share };
+
+  function slide(id, on) { $(id).classList.toggle('in', on); }
+  function sheetDown(down) { $('sheet').style.transform = down ? 'translateY(100%)' : ''; }
+
+  function closeAll(now) {
+    timers.forEach(clearTimeout); timers = [];
+    ['waPick', 'waPrev', 'waChat', 'waView'].forEach(function (id) { slide(id, false); });
+    sheetDown(false);
+    os.classList.remove('up');
+    if (now) { os.classList.remove('on'); os.setAttribute('aria-hidden', 'true'); return; }
+    later(function () { os.classList.remove('on'); os.setAttribute('aria-hidden', 'true'); }, 420);
+  }
+
+  /* a chat is chosen: WhatsApp shows the document before it goes */
+  function pick(who) {
+    if (!job) return;
+    job.to = who;
+    slide('waPick', false);
+    if (!job.file) { send(); return; }
+    job.file.then(function () {
+      avatar($('prevAv'), who); $('prevName').textContent = who.name;
+      $('prevSub').textContent = 'Document';
+      $('prevCap').textContent = job.text;
+      $('prevSend').disabled = true;
+      $('prevCount').hidden = true;
+      fillPages($('prevPages'), function (urls) {
+        $('prevSend').disabled = false;
+        var c = $('prevCount'); c.hidden = false; c.textContent = '1 of ' + urls.length;
+        var box = $('prevPages');
+        box.onscroll = function () {
+          var ims = box.querySelectorAll('img'), k = 0;
+          for (var i = 0; i < ims.length; i++) if (ims[i].offsetTop - box.offsetTop <= box.scrollTop + box.clientHeight / 3) k = i;
+          c.textContent = (k + 1) + ' of ' + urls.length;
+        };
+      });
+      $('prevPages').scrollTop = 0;
+      sheetDown(true);
+      slide('waPrev', true);
+    }, function () { send(); });            /* no PDF could be made: the text alone */
+  }
+
+  /* sent: the chat, with what was asked and what went back */
+  function send() {
+    var who = job.to, chat = $('chat');
+    avatar($('chatAv'), who); $('chatName').textContent = who.name;
+    $('chatSub').textContent = who.sub === 'Team group' ? 'You, Ahmed, Mariam, Karim' : 'online';
+    chat.innerHTML = '<span class="day">Today</span>';
+    if (who.asked) chat.insertAdjacentHTML('beforeend', '<div class="bub in">' + waText(REQUEST) + '<span class="tm">9:41</span></div>');
+    sheetDown(true);
+    slide('waPrev', false);
+    slide('waChat', true);
+    var at = 350, docAt = at;          /* the PDF first, then the text (as WhatsApp sends them) */
+    if (job.file) {
+      job.file.then(function (f) {
+        later(function () {
+          chat.insertAdjacentHTML('beforeend', '<div class="bub out doc pop" id="docBub" role="button" tabindex="0" aria-label="Open the offer PDF">' +
+            '<div class="pv" id="docPv"></div><div class="row"><span class="pdf">PDF</span><div><b>' + esc(f.name) + '</b>' +
+            '<span>' + f.pages + ' pages · PDF · ' + mb(f.size) + '</span></div></div><span class="tm">9:42 ' + TICKS + '</span></div>');
+          job.pages.then(function (urls) { var pv = $('docPv'); if (pv) pv.style.backgroundImage = 'url(' + urls[0] + ')'; });
+          $('docBub').addEventListener('click', openView);
+          $('docBub').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openView(); } });
+        }, docAt);
+      }, function () {});
+      at += 450;
+    }
+    later(function () {
+      chat.insertAdjacentHTML('beforeend', '<div class="bub out pop">' + waText(job.text) + '<span class="tm">9:42 ' + TICKS + '</span></div>');
+      chat.scrollTop = chat.scrollHeight;
+    }, at);
+    /* read by the broker */
+    later(function () {
+      [].forEach.call(chat.querySelectorAll('.tk'), function (t) { t.classList.add('read'); });
+      if (who.sub !== 'Team group') $('chatSub').textContent = 'online';
+    }, at + 1600);
+  }
+
+  function openView() {
+    if (!job || !job.file) return;
+    job.file.then(function (f) {
+      $('viewName').textContent = f.name;
+      $('viewSub').textContent = f.pages + ' pages · ' + mb(f.size);
+      fillPages($('viewPages'));
+      $('viewPages').scrollTop = 0;
+      slide('waView', true);
+    });
+  }
+
+  /* the sheet's rows */
+  PEOPLE.forEach(function (who) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'who' + (who.asked ? ' asked' : '');
+    b.setAttribute('aria-label', 'WhatsApp ' + who.name + ', ' + who.sub);
+    b.innerHTML = '<span class="av">' + initials(who.name) + '<i>' + WA_ICON + '</i></span><span class="nm">' + esc(who.name) + '<small>' + esc(who.sub) + '</small></span>';
+    b.querySelector('.av').style.background = who.bg;
+    b.addEventListener('click', function () { pick(who); });
+    $('shPeople').appendChild(b);
+  });
+  [['AirDrop', '#0a84ff', '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M8 16a6 6 0 1 1 8 0"/><path d="M5.2 19a10 10 0 1 1 13.6 0"/></svg>'],
+   ['WhatsApp', '#25D366', '<svg width="34" height="34" viewBox="0 0 24 24" fill="#fff"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.8l4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm0 2a7.8 7.8 0 1 1-4 14.5l-.3-.2-2.8.8.8-2.7-.2-.3A7.8 7.8 0 0 1 12 4.2Z"/></svg>'],
+   ['Messages', '#30d158', '<svg width="32" height="32" viewBox="0 0 24 24" fill="#fff"><path d="M12 3c5 0 9 3.4 9 7.6s-4 7.6-9 7.6c-1 0-2-.1-2.9-.4L4.5 20l1.2-3.6C4 15 3 13 3 10.6 3 6.4 7 3 12 3Z"/></svg>'],
+   ['Mail', '#0a84ff', '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>'],
+   ['Notes', '#ffd60a', '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#7a5c00" stroke-width="1.8" stroke-linecap="round"><path d="M6 8h12M6 12h12M6 16h8"/></svg>']
+  ].forEach(function (a) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'app2';
+    b.innerHTML = '<span class="ic2" style="background:' + a[1] + '">' + a[2] + '</span><span class="nm">' + a[0] + '</span>';
+    b.addEventListener('click', a[0] === 'WhatsApp' ? openPick : function () { toast('In this demo, share it on WhatsApp'); });
+    $('shApps').appendChild(b);
+  });
+  function openPick() {
+    var list = $('waPickList');
+    list.innerHTML = '<h6>Frequently contacted</h6>';
+    PEOPLE.forEach(function (who) {
+      var b = document.createElement('button'); b.type = 'button';
+      b.innerHTML = '<span class="av">' + initials(who.name) + '</span><div><b>' + esc(who.name) + '</b><span>' + esc(who.sub) + '</span></div>';
+      b.querySelector('.av').style.background = who.bg;
+      b.addEventListener('click', function () { pick(who); });
+      list.appendChild(b);
+    });
+    slide('waPick', true);
+  }
+  [].forEach.call(document.querySelectorAll('.sh-acts button'), function (b) {
+    b.addEventListener('click', function () {
+      if (b.dataset.act === 'copy' && job && navigator.clipboard) {
+        navigator.clipboard.writeText(job.text).then(function () { toast('Offer text copied'); }, function () { toast('Could not copy'); });
+      } else toast('In this demo, share it on WhatsApp');
+    });
+  });
+  $('shClose').addEventListener('click', function () { closeAll(); });
+  $('osDim').addEventListener('click', function () { closeAll(); });
+  $('prevSend').addEventListener('click', send);
+  [].forEach.call(document.querySelectorAll('[data-back]'), function (b) {
+    b.addEventListener('click', function () {
+      var k = b.dataset.back;
+      if (k === 'pick') slide('waPick', false);
+      else if (k === 'prev') { slide('waPrev', false); sheetDown(false); }
+      else if (k === 'view') slide('waView', false);
+      else closeAll();                                       /* chat: back to the app */
+    });
+  });
+
   note.addEventListener('click', answer);
   ring();
 
   document.getElementById('restart').addEventListener('click', ring);
   document.getElementById('moray').addEventListener('click', function () {
     clearTimeout(ringTimer);
+    closeAll(true);
     lock.classList.add('away', 'gone');
     screen.classList.remove('locked');
     req.hidden = false;
