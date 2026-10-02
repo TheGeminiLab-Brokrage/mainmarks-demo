@@ -29,7 +29,9 @@
     background: radial-gradient(ellipse at 50% 40%, #17171a 0%, #000 70%); }
 
   /* ---- the words beside the phone ---- */
-  .side { width: 300px; display: flex; flex-direction: column; gap: 22px; }
+  .side { width: 300px; display: flex; flex-direction: column; gap: 22px;
+    max-height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }   /* never cut off at the top */
+  .side::-webkit-scrollbar { display: none; }
   .side img.mm { width: 210px; height: auto; display: block; }
   .eyebrow { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
   .side h1 { margin: 0; font-size: 26px; font-weight: 300; line-height: 1.25; }
@@ -173,11 +175,14 @@
   .sh-acts button span { color: #c7c7cc; font-size: 17px; }
   /* ---- THE GUIDE (build 85): the stopwatch and the steps, beside the phone ---- */
   .guide { width: 300px; display: flex; flex-direction: column; gap: 18px; }
+  .guide-k { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
   .sw { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 14px;
     border: 1px solid var(--edge); background: rgba(255, 255, 255, .04); }
   .sw-k { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); line-height: 1.5; }
   .sw-t { font-size: 44px; font-weight: 300; line-height: 1.1; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
   .sw-s { font-size: 13px; line-height: 1.5; color: rgba(255, 255, 255, .72); }
+  .sw-best { font-size: 12px; color: var(--muted); }
+  .sw-best:empty { display: none; }
   .sw.is-run .sw-t { color: #fff; }
   .sw.is-done { border-color: rgba(37, 211, 102, .45); background: rgba(37, 211, 102, .07); }
   .sw.is-done .sw-t { color: #25D366; }
@@ -203,9 +208,47 @@
     .guide { display: none; }
     .sw-mini { display: flex; }
   }
-  /* the result, inside the chat (seen on a phone, where there is no column beside it) */
+  /* the stopwatch's result, inside the chat (seen on a phone, where there is no column beside it) */
   .chat .sent-chip { align-self: center; margin: 8px 0; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 600;
     color: #25D366; background: rgba(37, 211, 102, .1); border: 1px solid rgba(37, 211, 102, .35); }
+  /* ---- BEAT THE DEMO (build 87): the card on the phone at the end ---- */
+  .beat { position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-end; }
+  .beat[hidden] { display: none; }
+  .beat-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); opacity: 0; transition: opacity .3s ease; }
+  .beat-card { position: relative; width: 100%; padding: 22px 20px 34px; border-radius: 18px 18px 0 0; background: #111;
+    border-top: 1px solid rgba(37, 211, 102, .45); color: #fff; text-align: center;
+    transform: translateY(100%); transition: transform .45s cubic-bezier(.32, .72, 0, 1); }
+  .beat.in .beat-dim { opacity: 1; }
+  .beat.in .beat-card { transform: none; }
+  .beat-k { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: #25D366; }
+  .beat-t { margin: 8px 0 0; font-size: 46px; font-weight: 300; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .beat-h { margin: 10px 0 0; font-size: 18px; font-weight: 600; line-height: 1.3; }
+  .beat-p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: rgba(255, 255, 255, .72); }
+  .beat-acts { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+  .beat-go { font: inherit; font-size: 16px; font-weight: 700; padding: 14px; border-radius: 14px; border: 0; cursor: pointer;
+    background: #25D366; color: #04160b; }
+  .beat-row { display: flex; gap: 10px; }
+  .beat-row > * { flex: 1; font: inherit; font-size: 13.5px; font-weight: 600; padding: 11px; border-radius: 12px; cursor: pointer;
+    background: rgba(255, 255, 255, .07); border: 1px solid var(--edge); color: #fff; text-decoration: none; text-align: center; }
+  .beat-row > [hidden] { display: none; }
+  .beat-go:focus-visible, .beat-row > *:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+  /* ---- DOWNLOAD THE OFFER (build 86): once it is sent, the viewer can keep the PDF ---- */
+  .dl { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; text-decoration: none; color: #fff;
+    border: 1px solid rgba(37, 211, 102, .45); background: rgba(37, 211, 102, .08); }
+  .dl[hidden] { display: none; }
+  /* three columns: the download sits under the stopwatch, on the right; narrower, on the left */
+  @media (min-width: 1180px) { .side .dl { display: none; } }
+  .dl:hover { background: rgba(37, 211, 102, .14); }
+  .dl:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+  .dl .pdf { flex: none; width: 30px; height: 36px; border-radius: 3px; background: #e2483d; color: #fff;
+    font-size: 9px; font-weight: 700; display: grid; place-items: end center; padding-bottom: 5px; }
+  .dl b { display: block; font-size: 13.5px; font-weight: 600; }
+  .dl span.sub { display: block; font-size: 12px; color: rgba(255, 255, 255, .65); margin-top: 1px; }
+  /* in the chat, so a phone (no column beside it) has it too */
+  .chat .dl-chip { align-self: center; margin: 8px 0; padding: 7px 13px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
+    color: #25D366; background: rgba(37, 211, 102, .1); border: 1px solid rgba(37, 211, 102, .35); text-decoration: none; }
+  .wa-top .wa-dl { flex: none; color: #00a884; font-size: 15px; text-decoration: none; padding: 4px; }
+  .wa-top .wa-dl[hidden] { display: none; }
   .bub.in.typing { color: #8696a0; font-style: italic; }
 
   /* ---- WATCH IT (build 84): the demo plays itself, a tap mark at every touch ---- */
@@ -342,7 +385,12 @@
     <span class="sw-k">Stopwatch</span>
     <span class="sw-t">0:00.0</span>
     <span class="sw-s">Starts when the message is opened</span>
+    <span class="sw-best"></span>
   </div>
+  <a class="dl" id="dlSide" hidden download>
+    <span class="pdf" aria-hidden="true">PDF</span>
+    <span><b>Download the offer PDF</b><span class="sub" id="dlSideSub">The one just sent to the broker</span></span>
+  </a>
   <div class="creds">
     <span>Demo sign-in</span><br>
     Email <b>sales@demo.local</b><br>
@@ -432,12 +480,30 @@
         </section>
         <section class="wa from-bottom" id="waView" aria-label="The offer PDF">
           <div class="wa-top"><button type="button" data-back="view">Done</button>
-            <div class="tt"><b id="viewName"></b><span id="viewSub"></span></div></div>
+            <div class="tt"><b id="viewName"></b><span id="viewSub"></span></div>
+            <a class="wa-dl" id="viewDl" hidden download aria-label="Download the offer PDF">Download</a></div>
           <div class="pages" id="viewPages"></div>
         </section>
         <div class="toast" id="toast"></div>
       </div>
       <!-- Watch it (build 84): the tap mark, and a shield that hands control back on a tap -->
+      <!-- Beat the demo (build 87) -->
+      <div class="beat" id="beat" hidden role="dialog" aria-labelledby="beatH">
+        <div class="beat-dim"></div>
+        <div class="beat-card">
+          <p class="beat-k" id="beatK">Your turn</p>
+          <p class="beat-t" id="beatT">0:00</p>
+          <p class="beat-h" id="beatH"></p>
+          <p class="beat-p" id="beatP"></p>
+          <div class="beat-acts">
+            <button class="beat-go" type="button" id="beatGo">Try to beat it</button>
+            <div class="beat-row">
+              <a id="beatDl" hidden download>Download the PDF</a>
+              <button type="button" id="beatX">Stay here</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="shield" id="shield" hidden></div>
       <div class="tap" id="tap" aria-hidden="true"></div>
       <div class="home" aria-hidden="true"></div>
@@ -451,7 +517,13 @@
     <span class="sw-k">Stopwatch · from the broker’s message to the offer sent</span>
     <span class="sw-t">0:00.0</span>
     <span class="sw-s">Starts when the message is opened</span>
+    <span class="sw-best"></span>
   </div>
+  <a class="dl" id="dlGuide" hidden download>
+    <span class="pdf" aria-hidden="true">PDF</span>
+    <span><b>Download the offer PDF</b><span class="sub" id="dlGuideSub">The one just sent to the broker</span></span>
+  </a>
+  <p class="guide-k">Step by step</p>
   <ol class="steps2" id="steps2"></ol>
 </aside>
 
@@ -501,7 +573,8 @@
   function ring() {
     clearTimeout(ringTimer);
     closeAll(true); job = null;
-    swReset();
+    sentDone = false; reached = 0;
+    dlHide(); swReset(); beatHide();
     app.src = 'about:blank';
     req.hidden = true;
     lock.classList.remove('away', 'gone', 'ringing');
@@ -549,7 +622,7 @@
   ];
   var WA_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#fff"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.8l4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm0 2a7.8 7.8 0 1 1-4 14.5l-.3-.2-2.8.8.8-2.7-.2-.3A7.8 7.8 0 0 1 12 4.2Z"/></svg>';
   var TICKS = '<svg class="tk" width="17" height="11" viewBox="0 0 17 11" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6l3 3 6-7.5"/><path d="M7.5 8.6 8 9l6-7.5"/></svg>';
-  var job = null, timers = [];
+  var job = null, timers = [], lastUrl = null;
 
   function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -621,6 +694,8 @@
       job.file.then(function (f) {
         if (job !== mine) return;
         f.size = f.blob.size;
+        if (lastUrl) URL.revokeObjectURL(lastUrl);
+        f.url = lastUrl = URL.createObjectURL(f.blob);
         $('shName').textContent = f.name;
         $('shMeta').textContent = 'PDF Document · ' + f.pages + ' pages · ' + mb(f.size);
       }, function (e) {
@@ -686,7 +761,13 @@
   /* sent: the chat, with what was asked and what went back */
   function send() {
     var who = job.to, chat = $('chat');
-    var took = swStop();                 /* the offer is sent: the stopwatch stops */
+    sentDone = true;                     /* the offer is sent: the guide reaches its last step */
+    /* ... and the stopwatch stops. Only a run it was timing counts: a second
+       offer sent after it stopped has no time of its own. */
+    var timing = swStart != null && swEnd == null;
+    var took = timing ? swStop() : null;
+    var byTour = !!tour;
+    if (took != null && byTour) setDemoTime(took);
     avatar($('chatAv'), who); $('chatName').textContent = who.name;
     $('chatSub').textContent = who.sub === 'Team group' ? 'You, Ahmed, Mariam, Karim' : 'online';
     chat.innerHTML = '<span class="day">Today</span>';
@@ -711,7 +792,14 @@
     later(function () {
       chat.insertAdjacentHTML('beforeend', '<div class="bub out pop">' + waText(job.text) + '<span class="tm">9:42 ' + TICKS + '</span></div>');
       /* the stopwatch's result, as a note in the chat (on a phone there is no column beside it) */
-      if (took != null) chat.insertAdjacentHTML('beforeend', '<span class="sent-chip pop" id="sentChip">⏱ Offer sent ' + swWords(took) + ' after the broker’s message</span>');
+      if (took != null) chat.insertAdjacentHTML('beforeend', '<span class="sent-chip pop" id="sentChip">⏱ Offer sent in ' + swWords(took) + '</span>');
+      /* build 86: the offer can be kept. A real link (href + download), so the
+         viewer's own tap downloads it: nothing is opened from a timer. */
+      if (job.file) job.file.then(function (f) {
+        chat.insertAdjacentHTML('beforeend', '<a class="dl-chip pop" id="dlChat" href="' + f.url + '" download="' + esc(f.name) + '">⬇ Download this offer PDF</a>');
+        chat.scrollTop = chat.scrollHeight;
+        dlShow(f);
+      }, function () {});
       chat.scrollTop = chat.scrollHeight;
     }, at);
     /* read by the broker */
@@ -728,6 +816,7 @@
           '. Can we book a visit on Saturday at 11?<span class="tm">9:43</span></div>');
         chat.scrollTop = chat.scrollHeight;
       }, at + 4600);
+      if (took != null && !byTour && demoTime != null) later(function () { beatShow('you', took); }, at + 6800);
     }
   }
 
@@ -985,7 +1074,7 @@
       .then(function () { return glide(t, $('viewPages'), 3, 1100); })
       .then(function () { return tap(t, document.querySelector('[data-back="view"]')); })
       .then(function () { return wait(t, 600); })
-      .then(function () { stopTour(); toast('That’s the whole journey. Try it yourself.'); })
+      .then(function () { stopTour(); if (demoTime != null) beatShow('demo', demoTime); else toast('That’s the whole journey. Try it yourself.'); })
       .catch(function (e) {
         if (e instanceof Stopped) return;
         stopTour();
@@ -1005,12 +1094,10 @@
   shield.addEventListener('click', function () { stopTour(); toast('Your turn: carry on from here'); });
 
   /* ==================================================================
-     THE GUIDE AND THE STOPWATCH (build 85). The guide follows the phone,
+     THE GUIDE (build 85). The guide follows the phone,
      whether a person taps through or Watch it plays: it reads where the
-     app is (the page in the frame, what is open) ten times a second. The
-     stopwatch runs from opening the broker's message to the offer being
-     sent, and shows only what it measured: no "the old way takes..."
-     figure, because nobody has given us one.
+     app is (the page in the frame, what is open) ten times a second.
+     Build 86: the stopwatch is gone (Muhanad); the download stays.
      ================================================================== */
   var STEPS = [
     ['The request', 'A broker asks on WhatsApp for a client: the lowest-priced clinic on the 1st floor.'],
@@ -1022,7 +1109,8 @@
     ['Send on WhatsApp', 'The offer PDF is made on the phone and goes straight into the broker’s chat.'],
     ['Sent', 'The broker has the offer, the PDF and the plan, and answers.']
   ];
-  var stepsEl = $('steps2'), reached = 0, swStart = null, swEnd = null;
+  var stepsEl = $('steps2'), reached = 0, sentDone = false, swStart = null, swEnd = null, demoTime = null;
+  try { var dt0 = Number(localStorage.getItem('mm.demo.time')); if (dt0 > 0) demoTime = dt0; } catch (e) {}
   STEPS.forEach(function (st) {
     var li = document.createElement('li');
     li.innerHTML = '<b>' + esc(st[0]) + '</b><p>' + esc(st[1]) + '</p>';
@@ -1038,6 +1126,9 @@
     if (/projects\.html|p=moray/.test(path)) return 2;
     return 0;
   }
+  /* THE STOPWATCH: from opening the broker's message to the offer being sent.
+     It shows only what it measured. The demo's own time (Watch it) is kept
+     as the time to beat (build 87). */
   function swFmt(ms) {
     var s = ms / 1000, m = Math.floor(s / 60);
     return m + ':' + ('0' + Math.floor(s % 60)).slice(-2) + '.' + Math.floor((s * 10) % 10);
@@ -1048,22 +1139,73 @@
   }
   function swGo() { if (swStart == null) { swStart = Date.now(); swEnd = null; } }
   function swStop() { if (swStart != null && swEnd == null) swEnd = Date.now(); return swEnd != null ? swEnd - swStart : null; }
-  function swReset() { swStart = swEnd = null; reached = 0; }
+  function swReset() { swStart = swEnd = null; }
+  function setDemoTime(ms) { demoTime = ms; try { localStorage.setItem('mm.demo.time', String(ms)); } catch (e) {} }
   function paintGuide() {
-    reached = swEnd != null ? STEPS.length - 1 : Math.max(reached, stepNow());
+    reached = sentDone ? STEPS.length - 1 : Math.max(reached, stepNow());
     [].forEach.call(stepsEl.children, function (li, i) {
-      li.classList.toggle('is-done', i < reached || (swEnd != null && i === reached));
+      li.classList.toggle('is-done', i < reached || (sentDone && i === reached));
       li.classList.toggle('is-now', i === reached);
     });
     var txt = swStart == null ? '0:00.0' : swFmt((swEnd || Date.now()) - swStart);
     var sub = swEnd != null ? 'Offer sent in ' + swWords(swEnd - swStart)
       : swStart != null ? 'Running: from the broker’s message to the offer sent' : 'Starts when the message is opened';
+    var best = demoTime != null ? 'Time to beat (the demo): ' + swWords(demoTime) : '';
     [].forEach.call(document.querySelectorAll('.sw'), function (sw) {
       sw.querySelector('.sw-t').textContent = txt;
       sw.querySelector('.sw-s').textContent = sub;
+      sw.querySelector('.sw-best').textContent = best;
       sw.classList.toggle('is-run', swStart != null && swEnd == null);
       sw.classList.toggle('is-done', swEnd != null);
     });
+  }
+
+  /* BEAT THE DEMO (build 87). After Watch it: the demo's time, and an
+     invitation. After a person's own run: their time against it. */
+  var beat = $('beat');
+  function beatShow(kind, ms) {
+    var faster = demoTime != null && ms < demoTime;
+    $('beatT').textContent = swWords(ms);
+    if (kind === 'demo') {
+      $('beatK').textContent = 'The demo’s time';
+      $('beatH').textContent = 'The demo sent the offer in ' + swWords(ms) + '.';
+      $('beatP').textContent = 'From opening the broker’s message to the offer in her chat. Can you beat it?';
+      $('beatGo').textContent = 'Try to beat it';
+    } else if (faster) {
+      $('beatK').textContent = 'You beat the demo';
+      $('beatH').textContent = swWords(demoTime - ms) + ' faster than the demo.';
+      $('beatP').textContent = 'The demo took ' + swWords(demoTime) + '. You sent the offer in ' + swWords(ms) + '.';
+      $('beatGo').textContent = 'Go again';
+    } else {
+      $('beatK').textContent = 'Your time';
+      $('beatH').textContent = 'The demo took ' + swWords(demoTime) + '.';
+      $('beatP').textContent = (ms === demoTime ? 'A draw.' : swWords(ms - demoTime) + ' behind.') + ' Now you know the steps: try again?';
+      $('beatGo').textContent = 'Try again';
+    }
+    var dl = $('beatDl'), side = $('dlSide');
+    dl.hidden = side.hidden;
+    if (!side.hidden) { dl.href = side.href; dl.setAttribute('download', side.getAttribute('download')); }
+    beat.hidden = false;
+    void beat.offsetWidth;
+    beat.classList.add('in');
+    $('beatGo').focus();
+  }
+  function beatHide() { if (!beat) return; beat.classList.remove('in'); beat.hidden = true; }
+  $('beatGo').addEventListener('click', function () {
+    /* the same start as the demo had: signed out, nothing remembered, from the lock screen */
+    try { localStorage.removeItem('mm.session.v1'); sessionStorage.removeItem('mm.audience'); } catch (e) {}
+    beatHide();
+    ring();
+  });
+  $('beatX').addEventListener('click', beatHide);
+  beat.querySelector('.beat-dim').addEventListener('click', beatHide);
+  /* the download links (side card, viewer header): shown once the offer is sent */
+  function dlShow(f) {
+    ['dlSide', 'dlGuide', 'viewDl'].forEach(function (id) { var a = $(id); a.href = f.url; a.setAttribute('download', f.name); a.hidden = false; });
+    $('dlSideSub').textContent = $('dlGuideSub').textContent = f.name.replace(/\.pdf$/, '') + ' · ' + f.pages + ' pages · ' + mb(f.size);
+  }
+  function dlHide() {
+    ['dlSide', 'dlGuide', 'viewDl'].forEach(function (id) { var a = $(id); a.hidden = true; a.removeAttribute('href'); });
   }
   setInterval(paintGuide, 100);
 
@@ -1074,6 +1216,7 @@
   document.getElementById('moray').addEventListener('click', function () {
     clearTimeout(ringTimer);
     closeAll(true);
+    sentDone = false; reached = 0; dlHide(); beatHide();
     swReset(); swGo();
     lock.classList.add('away', 'gone');
     screen.classList.remove('locked');
