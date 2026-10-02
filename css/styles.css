@@ -2771,7 +2771,18 @@ body.is-ready .mv-hint { opacity: 1; }
 .q-who-opt:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
 .q-who-co { display: grid; gap: 7px; margin-top: 14px; }
 .q-who-co[hidden] { display: none; }
-.q-who-in { width: 100%; font-size: 15px; }
+.q-who-in { width: 100%; font-size: 16px; }      /* 16px: an iPhone zooms the page into smaller fields */
+/* build 85: the company is typed, and the list drops down under it, narrowing as you type */
+.q-who-field { position: relative; }
+.q-who-list { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 2; margin: 0; padding: 6px;
+  list-style: none; max-height: 220px; overflow-y: auto; border-radius: 12px; background: #1b1b1f;
+  border: 1px solid var(--q-edge-hi); box-shadow: 0 -10px 30px rgba(0, 0, 0, .55); }
+.q-who-list[hidden] { display: none; }
+.q-who-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px;
+  border-radius: 8px; font-size: 15px; color: var(--white); cursor: pointer; }
+.q-who-item:hover, .q-who-item.is-hi { background: var(--q-glass-hi); }
+.q-who-item em { font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--orange);
+  white-space: nowrap; }
 .q-who-note { font-size: 12px; line-height: 1.45; color: var(--q-faint); }
 .q-who-acts { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px; }
 .q-assume { margin: 18px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.55; color: var(--q-faint); }

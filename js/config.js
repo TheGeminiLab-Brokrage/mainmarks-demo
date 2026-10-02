@@ -14,7 +14,7 @@ const CONFIG = {
   /* Bumped on every deploy, and matched by the ?v= on every script tag in
      the HTML. That pair is what stops a returning phone running yesterday's
      JavaScript. See README, "Deploying". */
-  build: 84,
+  build: 85,
 
   /* Where the activity log is sent. Empty = kept on the device only, which
      is where it is today. Filling this in is the whole change when the
@@ -769,7 +769,12 @@ const CONFIG = {
         'The first instalment falls three months after the down payment, as in Main Marks’ sample contract.',
         'Maintenance and delivery are not included: Main Marks has not supplied them.'
       ],
-      brokerages: [],
+      /* A SAMPLE of Main Marks' own list (05 Sales & pricing\Broker company.xlsx,
+         76 companies; these are its rows 1-7, their spelling, spaces tidied).
+         Muhanad, 2026-10-03: only a few names on the public demo link; the
+         contract promises the broker list is never disclosed. The full list
+         goes in with the login gate. Feeds "Who is this offer for?". */
+      brokerages: ['Views', 'Nawy', 'High Level', 'Market Standerd', 'Twelve Real Estate', 'We Prime', 'Redz Investment'],
       source:  'Moray brochure (Digital Brochure, Oct 2025)',
 
       /* OPEN. Moray is the project the contract buys, so it is the live

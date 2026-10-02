@@ -171,6 +171,43 @@
     background: none; border: 0; color: #fff; font: inherit; font-size: 16px; cursor: pointer; text-align: left; }
   .sh-acts button + button { border-top: .5px solid #3a3a3c; }
   .sh-acts button span { color: #c7c7cc; font-size: 17px; }
+  /* ---- THE GUIDE (build 85): the stopwatch and the steps, beside the phone ---- */
+  .guide { width: 300px; display: flex; flex-direction: column; gap: 18px; }
+  .sw { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 14px;
+    border: 1px solid var(--edge); background: rgba(255, 255, 255, .04); }
+  .sw-k { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); line-height: 1.5; }
+  .sw-t { font-size: 44px; font-weight: 300; line-height: 1.1; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+  .sw-s { font-size: 13px; line-height: 1.5; color: rgba(255, 255, 255, .72); }
+  .sw.is-run .sw-t { color: #fff; }
+  .sw.is-done { border-color: rgba(37, 211, 102, .45); background: rgba(37, 211, 102, .07); }
+  .sw.is-done .sw-t { color: #25D366; }
+  .sw.is-done .sw-s { color: #fff; font-weight: 600; }
+  .sw-mini { display: none; }
+  .sw-mini .sw-t { font-size: 30px; }
+  .steps2 { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; counter-reset: st; }
+  .steps2 li { position: relative; padding: 7px 0 7px 36px; counter-increment: st; color: rgba(255, 255, 255, .45);
+    transition: color .3s ease; }
+  .steps2 li::before { content: counter(st); position: absolute; left: 0; top: 6px; width: 24px; height: 24px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 11.5px; font-weight: 700; border: 1px solid rgba(255, 255, 255, .2);
+    color: rgba(255, 255, 255, .55); transition: all .3s ease; }
+  .steps2 li b { display: block; font-size: 14px; font-weight: 600; line-height: 1.7; }
+  .steps2 li p { margin: 2px 0 4px; font-size: 13px; line-height: 1.55; color: rgba(255, 255, 255, .78);
+    display: none; }
+  .steps2 li.is-done { color: rgba(255, 255, 255, .7); }
+  .steps2 li.is-done::before { content: '✓'; background: rgba(37, 211, 102, .16); border-color: rgba(37, 211, 102, .5); color: #25D366; }
+  .steps2 li.is-now { color: #fff; }
+  .steps2 li.is-now::before { background: #25D366; border-color: #25D366; color: #04160b; }
+  .steps2 li.is-now p { display: block; }
+  /* a laptop narrower than three columns: the guide folds away, the stopwatch stays on the left */
+  @media (max-width: 1179px) and (min-width: 761px) {
+    .guide { display: none; }
+    .sw-mini { display: flex; }
+  }
+  /* the result, inside the chat (seen on a phone, where there is no column beside it) */
+  .chat .sent-chip { align-self: center; margin: 8px 0; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 600;
+    color: #25D366; background: rgba(37, 211, 102, .1); border: 1px solid rgba(37, 211, 102, .35); }
+  .bub.in.typing { color: #8696a0; font-style: italic; }
+
   /* ---- WATCH IT (build 84): the demo plays itself, a tap mark at every touch ---- */
   .btn-watch { background: #25D366; border-color: #25D366; color: #04160b; }
   .btn-watch:hover { border-color: #5ee08f; background: #3ddc79; }
@@ -183,6 +220,14 @@
   .tap { position: absolute; z-index: 7; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
     pointer-events: none; opacity: 0; background: rgba(255, 255, 255, .32); box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 4px 18px rgba(0, 0, 0, .45); }
   .tap.on { animation: tapIn .9s ease-out forwards; }
+  /* a swipe: the finger lands, slides left, lifts (build 85) */
+  .tap.swipe { animation: swipeIn 1s ease-in-out forwards; }
+  @keyframes swipeIn {
+    0% { opacity: 0; transform: translateX(80px) scale(1.2); }
+    18% { opacity: 1; transform: translateX(80px) scale(1); }
+    80% { opacity: 1; transform: translateX(-80px) scale(1); }
+    100% { opacity: 0; transform: translateX(-90px) scale(1.15); }
+  }
   @keyframes tapIn {
     0% { opacity: 0; transform: scale(1.5); }
     25% { opacity: 1; transform: scale(1); }
@@ -273,6 +318,7 @@
     .screen { border-radius: 0; }
     .lock { padding-top: 70px; }
     .watch-pill { display: block; }          /* the side panel, with its Watch it button, is hidden here */
+    .guide { display: none; }                /* the result shows in the chat instead */
     .note { top: 270px; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -291,6 +337,11 @@
   <div class="req" id="req" hidden>
     <span>The request</span>
     Sara Sales Nawy, a broker at Nawy: a cardiologist wants the lowest-priced clinic at Moray Wellness, on the first floor only (his patients have heart problems).
+  </div>
+  <div class="sw sw-mini" aria-hidden="true">
+    <span class="sw-k">Stopwatch</span>
+    <span class="sw-t">0:00.0</span>
+    <span class="sw-s">Starts when the message is opened</span>
   </div>
   <div class="creds">
     <span>Demo sign-in</span><br>
@@ -394,6 +445,16 @@
   </div>
 </div>
 
+<!-- build 85: what is happening, step by step, and how long it has taken -->
+<aside class="guide" aria-label="What is happening">
+  <div class="sw">
+    <span class="sw-k">Stopwatch · from the broker’s message to the offer sent</span>
+    <span class="sw-t">0:00.0</span>
+    <span class="sw-s">Starts when the message is opened</span>
+  </div>
+  <ol class="steps2" id="steps2"></ol>
+</aside>
+
 <script>
 (function () {
   'use strict';
@@ -404,7 +465,9 @@
   function fit() {
     if (window.matchMedia('(max-width: 760px)').matches) { phone.style.transform = ''; return; }
     var h = phone.offsetHeight, w = phone.offsetWidth;
-    var s = Math.min(1, (window.innerHeight - 48) / h, (window.innerWidth - 380) / w);
+    /* room for the words on the left, and the guide on the right when it shows */
+    var side = 380 + (window.matchMedia('(min-width: 1180px)').matches ? 356 : 0);
+    var s = Math.min(1, (window.innerHeight - 48) / h, (window.innerWidth - side) / w);
     phone.style.transform = 'scale(' + Math.max(0.5, s).toFixed(3) + ')';
   }
   window.addEventListener('resize', fit);
@@ -438,6 +501,7 @@
   function ring() {
     clearTimeout(ringTimer);
     closeAll(true); job = null;
+    swReset();
     app.src = 'about:blank';
     req.hidden = true;
     lock.classList.remove('away', 'gone', 'ringing');
@@ -448,6 +512,7 @@
 
   function answer() {
     if (lock.classList.contains('away')) return;
+    swGo();                                      /* the stopwatch: from opening the broker's message */
     var done = false;
     function unlock() {
       if (done) return;
@@ -621,6 +686,7 @@
   /* sent: the chat, with what was asked and what went back */
   function send() {
     var who = job.to, chat = $('chat');
+    var took = swStop();                 /* the offer is sent: the stopwatch stops */
     avatar($('chatAv'), who); $('chatName').textContent = who.name;
     $('chatSub').textContent = who.sub === 'Team group' ? 'You, Ahmed, Mariam, Karim' : 'online';
     chat.innerHTML = '<span class="day">Today</span>';
@@ -644,6 +710,8 @@
     }
     later(function () {
       chat.insertAdjacentHTML('beforeend', '<div class="bub out pop">' + waText(job.text) + '<span class="tm">9:42 ' + TICKS + '</span></div>');
+      /* the stopwatch's result, as a note in the chat (on a phone there is no column beside it) */
+      if (took != null) chat.insertAdjacentHTML('beforeend', '<span class="sent-chip pop" id="sentChip">⏱ Offer sent ' + swWords(took) + ' after the broker’s message</span>');
       chat.scrollTop = chat.scrollHeight;
     }, at);
     /* read by the broker */
@@ -651,6 +719,16 @@
       [].forEach.call(chat.querySelectorAll('.tk'), function (t) { t.classList.add('read'); });
       if (who.sub !== 'Team group') $('chatSub').textContent = 'online';
     }, at + 1600);
+    /* build 85: the broker who asked answers -- the request has become a visit */
+    if (who.asked) {
+      later(function () { $('chatSub').textContent = 'typing…'; }, at + 2600);
+      later(function () {
+        $('chatSub').textContent = 'online';
+        chat.insertAdjacentHTML('beforeend', '<div class="bub in pop" id="reply">Thank you! My client likes ' + esc(job.unit) +
+          '. Can we book a visit on Saturday at 11?<span class="tm">9:43</span></div>');
+        chat.scrollTop = chat.scrollHeight;
+      }, at + 4600);
+    }
   }
 
   function openView() {
@@ -752,13 +830,13 @@
   function appAt(path) { try { return (win().location.pathname + win().location.search).indexOf(path) !== -1 && doc().readyState === 'complete'; } catch (e) { return false; } }
 
   /* the tap mark, centred on an element of the app (inside the frame) or of the phone */
-  function mark(el) {
+  function mark(el, kind) {
     var sr = screen.getBoundingClientRect(), s = sr.width / screen.offsetWidth, x, y;
     var r = el.getBoundingClientRect();
     if (el.ownerDocument === document) { x = (r.left + r.width / 2 - sr.left) / s; y = (r.top + r.height / 2 - sr.top) / s; }
     else { x = app.offsetLeft + r.left + r.width / 2; y = app.offsetTop + r.top + r.height / 2; }
     tapEl.style.left = x + 'px'; tapEl.style.top = y + 'px';
-    tapEl.classList.remove('on'); void tapEl.offsetWidth; tapEl.classList.add('on');
+    tapEl.classList.remove('on', 'swipe'); void tapEl.offsetWidth; tapEl.classList.add(kind || 'on');
   }
   function tap(t, el, how) {
     mark(el);
@@ -766,6 +844,17 @@
       if (how) how(el); else if (typeof el.click === 'function') el.click();
       else el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       return wait(t, 450);
+    });
+  }
+  /* a swipe on the line cards: the finger slides left, the row moves one card on */
+  function swipeTo(t, id) {
+    var row = q('.l-cards'), card = q('.l-card[data-line="' + id + '"]');
+    if (!row || !card) throw new Error('no ' + id + ' card');
+    mark(row, 'swipe');
+    return wait(t, 220).then(function () {
+      var rr = row.getBoundingClientRect(), cr = card.getBoundingClientRect();
+      row.scrollBy({ left: cr.left + cr.width / 2 - (rr.left + rr.width / 2), behavior: 'smooth' });
+      return wait(t, 2400);                                /* the lights change: let the eye see it */
     });
   }
   /* bring an element of the app into view, smoothly, as a thumb would */
@@ -821,7 +910,10 @@
       .then(function () { var a = q('a[href*="p=moray"]'); return show(t, a).then(function () { return tap(t, a); }); })
       .then(function () { return until(t, function () { return appAt('p=moray') && visible(q('a[href*="line=wellness"]')); }, 20000, 'Moray'); })
       .then(function () { return wait(t, 3200); })
-      .then(function () { var a = q('a[href*="line=wellness"]'); return show(t, a).then(function () { return tap(t, a); }); })
+      /* swipe, card by card: each line lights its own buildings on the aerial */
+      .then(function () { return swipeTo(t, 'fourth'); })
+      .then(function () { return swipeTo(t, 'wellness'); })
+      .then(function () { return tap(t, q('a[href*="line=wellness"]')); })
       .then(function () { return until(t, function () { return appAt('line=wellness') && visible(q('.fd-toggle')); }, 20000, 'Moray Wellness'); })
       .then(function () { return wait(t, 3800); })
       /* 4. Find a unit: By unit, 1st floor, the cheapest match */
@@ -865,7 +957,14 @@
       .then(function () { return until(t, function () { return visible(q('.q-who.in .q-who-opt[data-a="broker"]')); }, 6000, 'the question'); })
       .then(function () { return wait(t, 1400); })
       .then(function () { return tap(t, q('.q-who-opt[data-a="broker"]')); })
-      .then(function () { return wait(t, 1300); })
+      .then(function () { return wait(t, 700); })
+      .then(function () { return tap(t, q('.q-who-in'), function (el) { el.focus(); el.click(); }); })
+      .then(function () { return wait(t, 1100); })                 /* the list drops down */
+      .then(function () { return type(t, q('.q-who-in'), 'Na'); })
+      .then(function () { return until(t, function () { return visible(q('.q-who-item[data-name="Nawy"]')); }, 4000, 'Nawy in the list'); })
+      .then(function () { return wait(t, 1000); })
+      .then(function (el) { return tap(t, q('.q-who-item[data-name="Nawy"]'), function (li) { li.dispatchEvent(new (li.ownerDocument.defaultView.PointerEvent)('pointerdown', { bubbles: true, cancelable: true })); }); })
+      .then(function () { return wait(t, 900); })
       .then(function () { return tap(t, q('.q-who .q-cta')); })
       .then(function () { return until(t, function () { return $('shThumb').style.backgroundImage; }, 30000, 'the offer PDF'); })
       .then(function () { return wait(t, 1500); })
@@ -878,7 +977,8 @@
       .then(function () { return tap(t, $('prevSend')); })
       /* 9. sent, read; open it as the broker sees it */
       .then(function () { return until(t, function () { return $('docBub'); }, 8000, 'the chat'); })
-      .then(function () { return wait(t, 3000); })
+      .then(function () { return until(t, function () { return $('reply'); }, 12000, 'the broker’s reply'); })
+      .then(function () { return wait(t, 2600); })
       .then(function () { return tap(t, $('docBub')); })
       .then(function () { return until(t, function () { return $('viewPages').querySelector('img'); }, 15000, 'the viewer'); })
       .then(function () { return wait(t, 1000); })
@@ -896,13 +996,76 @@
   function stopTour(quiet) {
     tour = null;
     shield.hidden = true;
-    tapEl.classList.remove('on');
+    tapEl.classList.remove('on', 'swipe');
     watchBtn.setAttribute('aria-pressed', 'false'); watchBtn.querySelector('.wl').textContent = 'Watch it';
     watchBtn.querySelector('.wi').textContent = '▶';
   }
   watchBtn.addEventListener('click', function () { if (tour) stopTour(); else play(); });
   $('watch2').addEventListener('click', function (e) { e.stopPropagation(); play(); });
   shield.addEventListener('click', function () { stopTour(); toast('Your turn: carry on from here'); });
+
+  /* ==================================================================
+     THE GUIDE AND THE STOPWATCH (build 85). The guide follows the phone,
+     whether a person taps through or Watch it plays: it reads where the
+     app is (the page in the frame, what is open) ten times a second. The
+     stopwatch runs from opening the broker's message to the offer being
+     sent, and shows only what it measured: no "the old way takes..."
+     figure, because nobody has given us one.
+     ================================================================== */
+  var STEPS = [
+    ['The request', 'A broker asks on WhatsApp for a client: the lowest-priced clinic on the 1st floor.'],
+    ['Sign in', 'Each salesperson signs in once, so every offer carries their name.'],
+    ['Project and line', 'Swipe Moray’s lines: each card lights its own buildings on the aerial.'],
+    ['Find the unit', 'Find a unit searches Main Marks’ price list. The answer glows on the floor drawing.'],
+    ['The payment plan', 'Every figure is worked out from Main Marks’ own plans. Nobody types a number.'],
+    ['Who is it for', 'A special request is counted for the broker’s company, so the manager sees who asks.'],
+    ['Send on WhatsApp', 'The offer PDF is made on the phone and goes straight into the broker’s chat.'],
+    ['Sent', 'The broker has the offer, the PDF and the plan, and answers.']
+  ];
+  var stepsEl = $('steps2'), reached = 0, swStart = null, swEnd = null;
+  STEPS.forEach(function (st) {
+    var li = document.createElement('li');
+    li.innerHTML = '<b>' + esc(st[0]) + '</b><p>' + esc(st[1]) + '</p>';
+    stepsEl.appendChild(li);
+  });
+  function stepNow() {
+    if (!lock.classList.contains('gone')) return 0;
+    if (os.classList.contains('on')) return $('waChat').classList.contains('in') ? 7 : 6;
+    var path = '';
+    try { path = win().location.pathname + win().location.search; } catch (e) { return reached; }
+    if (/login\.html/.test(path)) return 1;
+    if (/line=/.test(path)) return q('.q-who.in') ? 5 : visible(q('.q-plansel')) ? 4 : 3;
+    if (/projects\.html|p=moray/.test(path)) return 2;
+    return 0;
+  }
+  function swFmt(ms) {
+    var s = ms / 1000, m = Math.floor(s / 60);
+    return m + ':' + ('0' + Math.floor(s % 60)).slice(-2) + '.' + Math.floor((s * 10) % 10);
+  }
+  function swWords(ms) {
+    var s = Math.round(ms / 1000), m = Math.floor(s / 60), r = s % 60;
+    return (m ? m + ' min ' : '') + r + ' s';
+  }
+  function swGo() { if (swStart == null) { swStart = Date.now(); swEnd = null; } }
+  function swStop() { if (swStart != null && swEnd == null) swEnd = Date.now(); return swEnd != null ? swEnd - swStart : null; }
+  function swReset() { swStart = swEnd = null; reached = 0; }
+  function paintGuide() {
+    reached = swEnd != null ? STEPS.length - 1 : Math.max(reached, stepNow());
+    [].forEach.call(stepsEl.children, function (li, i) {
+      li.classList.toggle('is-done', i < reached || (swEnd != null && i === reached));
+      li.classList.toggle('is-now', i === reached);
+    });
+    var txt = swStart == null ? '0:00.0' : swFmt((swEnd || Date.now()) - swStart);
+    var sub = swEnd != null ? 'Offer sent in ' + swWords(swEnd - swStart)
+      : swStart != null ? 'Running: from the broker’s message to the offer sent' : 'Starts when the message is opened';
+    [].forEach.call(document.querySelectorAll('.sw'), function (sw) {
+      sw.querySelector('.sw-t').textContent = txt;
+      sw.querySelector('.sw-s').textContent = sub;
+      sw.classList.toggle('is-run', swStart != null && swEnd == null);
+      sw.classList.toggle('is-done', swEnd != null);
+    });
+  }
+  setInterval(paintGuide, 100);
 
   note.addEventListener('click', answer);
   ring();
@@ -911,6 +1074,7 @@
   document.getElementById('moray').addEventListener('click', function () {
     clearTimeout(ringTimer);
     closeAll(true);
+    swReset(); swGo();
     lock.classList.add('away', 'gone');
     screen.classList.remove('locked');
     req.hidden = false;

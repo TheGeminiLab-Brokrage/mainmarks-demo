@@ -928,18 +928,60 @@
       opt('broadcast', 'General broadcast', 'Groups, channels, status. No single company.');
       card.appendChild(opts);
 
-      var co = el('label', 'q-who-co'); co.hidden = true;
-      co.appendChild(el('span', 'q-k', t('Which company asked?')));
+      /* the company: TYPED, with a dropdown of the brokerage list that
+         narrows as you type (build 85; a <datalist> shows nothing on an
+         iPhone until you guess a letter, so the list is drawn here). The
+         company the request came from is listed first and says so. */
+      var co = el('div', 'q-who-co'); co.hidden = true;
+      var lab = el('label', 'q-k', t('Which company asked?')); lab.setAttribute('for', 'qWhoIn');
+      co.appendChild(lab);
+      var field = el('div', 'q-who-field');
       var inp = el('input', 'q-select q-who-in');
-      inp.type = 'text'; inp.placeholder = t('Brokerage company'); inp.autocomplete = 'off';
-      if (list.length) {
-        var dl = el('datalist'); dl.id = 'qWhoList';
-        list.forEach(function (n) { var o2 = el('option'); o2.value = n; dl.appendChild(o2); });
-        co.appendChild(dl); inp.setAttribute('list', 'qWhoList');
-      }
-      co.appendChild(inp);
+      inp.id = 'qWhoIn'; inp.type = 'text'; inp.placeholder = t('Type the brokerage company'); inp.autocomplete = 'off';
+      inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-autocomplete', 'list');
+      inp.setAttribute('aria-controls', 'qWhoList'); inp.setAttribute('aria-expanded', 'false');
+      var drop = el('ul', 'q-who-list'); drop.id = 'qWhoList'; drop.setAttribute('role', 'listbox'); drop.hidden = true;
+      field.appendChild(inp); field.appendChild(drop);
+      co.appendChild(field);
       if (!list.length) co.appendChild(el('span', 'q-who-note', t('Main Marks’ brokerage list will fill this once it is sent. Type the company for now.')));
       card.appendChild(co);
+
+      var names = asked && list.indexOf(asked) > 0 ? [asked].concat(list.filter(function (n) { return n !== asked; })) : list;
+      var hi = -1;
+      function matches() {
+        var s = inp.value.trim().toLowerCase();
+        return names.filter(function (n) { return !s || n.toLowerCase().indexOf(s) !== -1; });
+      }
+      function paintDrop(open) {
+        var m = matches();
+        drop.textContent = '';
+        if (!open || !m.length || (m.length === 1 && m[0] === inp.value.trim())) {
+          drop.hidden = true; inp.setAttribute('aria-expanded', 'false'); return;
+        }
+        if (hi >= m.length) hi = m.length - 1;
+        m.forEach(function (n, i) {
+          var li = el('li', 'q-who-item' + (i === hi ? ' is-hi' : ''));
+          li.setAttribute('role', 'option'); li.dataset.name = n;
+          li.appendChild(el('span', null, n));
+          if (n === asked) li.appendChild(el('em', null, t('Sent the request')));
+          /* pointerdown, not click: the field's blur would close the list first */
+          li.addEventListener('pointerdown', function (e) { e.preventDefault(); pickName(n); });
+          drop.appendChild(li);
+        });
+        drop.hidden = false; inp.setAttribute('aria-expanded', 'true');
+      }
+      function pickName(n) { inp.value = n; hi = -1; paintDrop(false); check(); }
+      inp.addEventListener('focus', function () { paintDrop(true); });
+      inp.addEventListener('click', function () { paintDrop(true); });   /* a tap on a field that already has focus */
+      inp.addEventListener('input', function () { hi = -1; paintDrop(true); });
+      inp.addEventListener('blur', function () { setTimeout(function () { paintDrop(false); }, 120); });
+      inp.addEventListener('keydown', function (e) {
+        var m = matches();
+        if (e.key === 'ArrowDown') { e.preventDefault(); hi = Math.min(m.length - 1, hi + 1); paintDrop(true); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); hi = Math.max(0, hi - 1); paintDrop(true); }
+        else if (e.key === 'Enter' && hi >= 0 && m[hi]) { e.preventDefault(); pickName(m[hi]); }
+        else if (e.key === 'Escape' && !drop.hidden) { e.stopPropagation(); paintDrop(false); }
+      });
 
       var acts = el('div', 'q-who-acts');
       var cancel = el('button', 'q-ghost', t('Cancel')); cancel.type = 'button';
@@ -953,7 +995,7 @@
         audience = a;
         [].forEach.call(opts.children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.a === a)); });
         co.hidden = a !== 'broker';
-        if (a === 'broker' && !inp.value) inp.value = asked || (last && last.audience === 'broker' && last.company) || '';
+        if (a === 'broker' && !inp.value && !asked) inp.value = (last && last.audience === 'broker' && last.company) || '';
         check();
       }
       function check() { go2.disabled = !audience || (audience === 'broker' && !inp.value.trim()); }
