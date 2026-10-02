@@ -14,7 +14,7 @@ const CONFIG = {
   /* Bumped on every deploy, and matched by the ?v= on every script tag in
      the HTML. That pair is what stops a returning phone running yesterday's
      JavaScript. See README, "Deploying". */
-  build: 88,
+  build: 89,
 
   /* Where the activity log is sent. Empty = kept on the device only, which
      is where it is today. Filling this in is the whole change when the
@@ -776,7 +776,7 @@ const CONFIG = {
          THE PUBLIC DEMO LINK carries only a 7-name sample: scripts/make-demo-publish.js
          cuts this list between the two markers (his choice, 2026-10-03; the contract
          promises the broker list is never disclosed). */
-      brokerages: /* BROKERAGES:START (demo sample) */ ['Views', 'Nawy', 'High Level', 'Market Standerd', 'Twelve Real Estate', 'We Prime', 'Redz Investment'] /* BROKERAGES:END */,
+      brokerages: /* BROKERAGES:START (demo sample) */ ['Views', 'Nawy', 'High Level', 'Market Standerd', 'Twelve Real Estate', 'We Prime', 'Redz Investment', 'السقا', 'Real Challenge', 'Shortcut', 'Th', 'coldwell banker', 'New Avenue', 'The Address Investment', 'Real Chance', 'curve', 'Westse', 'M I Invest', 'sokin', 'AMG', 'everscopes', 'الدجوي', 'connect homes', 'the lark group', 'silverline', 'Millers', 'Aqar gold', 'B2B', 'seen', 'OMD', 'limitless', 'Equal Estate', 'white Line', 'sodik home', 'PRO TITANIUM GROUP', 'Bold Routes', 'المراد للتسويق العقاري', 'Wealth', 'HOPE', 'Free Brokers', 'Isola Vista', 'Insider', 'Veterans', 'Crete investment', 'Hello Deal', 'Special Key', 'Regor', 'Y the brokers', 'Investa', 'Sand Stone', 'ElHelmy', 'ALQODS القدس', 'Element', 'KHL', 'Red Hills', 'Places', 'Fav Deal', 'Frensh House', 'DRI', 'Luxury Housing', 'The House', 'A PLUS', 'Top Managment', 'Setaj', 'AK', 'The Land', 'We state', 'NOD', 'The Trust', 'Pharaohs', 'Elkarma', 'GIG', 'Smart Property', 'Irtkaz', 'Neo Gen Royal', 'Eska- the stone'] /* BROKERAGES:END */,
       source:  'Moray brochure (Digital Brochure, Oct 2025)',
 
       /* OPEN. Moray is the project the contract buys, so it is the live
