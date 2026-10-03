@@ -346,6 +346,9 @@
   .bub.doc .row b { display: block; font-size: 13.5px; font-weight: 500; line-height: 1.3; word-break: break-word; }
   .bub.doc .row span { display: block; font-size: 12px; color: rgba(233, 237, 239, .6); margin-top: 2px; }
   .bub.doc .tm { float: none; display: flex; justify-content: flex-end; margin: 2px 4px 0; }
+  .bub.ph { padding: 3px; width: 80%; }
+  .bub.ph img { display: block; width: 100%; max-height: 360px; object-fit: cover; object-position: top; border-radius: 6px; }
+  .bub.ph .cap { padding: 6px 6px 2px; }
   .bub.pop { animation: pop .3s cubic-bezier(.2, 1.2, .4, 1) both; }
   @keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.97); } }
   .wa-bar { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 10px 30px; background: #1f2c34; }
@@ -627,7 +630,7 @@
   function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   /* WhatsApp's own formatting: *bold*, line breaks */
-  function waText(s) { return esc(s).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/\n/g, '<br>'); }
+  function waText(s) { return esc(s).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/~([^~\n]+)~/g, '<s>$1</s>').replace(/\n/g, '<br>'); }
   function initials(n) { return n.split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase(); }
   function avatar(el, who) { el.textContent = (who.ini || initials(who.name)); el.style.background = who.bg; }
   function mb(bytes) { return bytes > 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' kB'; }
@@ -715,8 +718,32 @@
     void os.offsetWidth;
     os.classList.add('up');
   }
+  /* build 91: the WhatsApp POST (the app's js/post.js) through the same share
+     sheet. It arrives as ONE photo bubble with the caption under it, as
+     WhatsApp sends a picture with text. No picture (an untraced unit): the
+     text alone, as share() does. */
+  function sharePost(o) {
+    closeAll(true);
+    job = { text: o.text, unit: o.unit, agent: o.agent, to: null, file: null, pages: null, image: null };
+    var thumb = $('shThumb');
+    thumb.className = 'sh-thumb'; thumb.style.backgroundImage = ''; thumb.innerHTML = '';
+    if (o.image) {
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      job.image = { url: lastUrl = URL.createObjectURL(o.image), name: o.image.name, size: o.image.size };
+      thumb.style.backgroundImage = 'url(' + job.image.url + ')';
+      $('shName').textContent = o.image.name;
+      $('shMeta').textContent = 'JPEG Image · ' + mb(o.image.size);
+    } else {
+      $('shName').textContent = 'Post · ' + o.unit;
+      $('shMeta').textContent = 'Text · this unit has no picture yet';
+      thumb.className = 'sh-thumb is-text'; thumb.innerHTML = WA_ICON;
+    }
+    os.classList.add('on'); os.setAttribute('aria-hidden', 'false');
+    void os.offsetWidth;
+    os.classList.add('up');
+  }
   /* what the request on the lock screen was, so the app's "who is it for" can name the company */
-  window.MMDemo = { share: share, request: { from: 'Sara Sales Nawy', company: 'Nawy' } };
+  window.MMDemo = { share: share, sharePost: sharePost, request: { from: 'Sara Sales Nawy', company: 'Nawy' } };
 
   function slide(id, on) { $(id).classList.toggle('in', on); }
   function sheetDown(down) { $('sheet').style.transform = down ? 'translateY(100%)' : ''; }
@@ -735,6 +762,19 @@
     if (!job) return;
     job.to = who;
     slide('waPick', false);
+    if (job.image) {                     /* build 91: WhatsApp's photo preview, with the caption */
+      avatar($('prevAv'), who); $('prevName').textContent = who.name;
+      $('prevSub').textContent = 'Photo';
+      $('prevCap').textContent = job.text;
+      $('prevCount').hidden = true;
+      var pb = $('prevPages'); pb.onscroll = null; pb.innerHTML = '';
+      var im = new Image(); im.src = job.image.url; im.alt = 'The post picture'; pb.appendChild(im);
+      pb.scrollTop = 0;
+      $('prevSend').disabled = false;
+      sheetDown(true);
+      slide('waPrev', true);
+      return;
+    }
     if (!job.file) { send(); return; }
     job.file.then(function () {
       avatar($('prevAv'), who); $('prevName').textContent = who.name;
@@ -790,6 +830,11 @@
       at += 450;
     }
     later(function () {
+      if (job.image) {                   /* build 91: the post, one photo bubble with its caption */
+        chat.insertAdjacentHTML('beforeend', '<div class="bub out ph pop"><img src="' + job.image.url + '" alt="The post picture">' +
+          '<div class="cap" dir="auto">' + waText(job.text) + '<span class="tm">9:42 ' + TICKS + '</span></div></div>');
+        chat.insertAdjacentHTML('beforeend', '<a class="dl-chip pop" href="' + job.image.url + '" download="' + esc(job.image.name) + '">⬇ Download the post picture</a>');
+      } else
       chat.insertAdjacentHTML('beforeend', '<div class="bub out pop">' + waText(job.text) + '<span class="tm">9:42 ' + TICKS + '</span></div>');
       /* the stopwatch's result, as a note in the chat (on a phone there is no column beside it) */
       if (took != null) chat.insertAdjacentHTML('beforeend', '<span class="sent-chip pop" id="sentChip">⏱ Offer sent in ' + swWords(took) + '</span>');

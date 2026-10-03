@@ -2774,17 +2774,61 @@ body.is-ready .mv-hint { opacity: 1; }
 .q-who-in { width: 100%; font-size: 16px; }      /* 16px: an iPhone zooms the page into smaller fields */
 /* build 85: the company is typed, and the list drops down under it, narrowing as you type */
 .q-who-field { position: relative; }
-.q-who-list { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 2; margin: 0; padding: 6px;
-  list-style: none; max-height: 220px; overflow-y: auto; border-radius: 12px; background: #1b1b1f;
-  border: 1px solid var(--q-edge-hi); box-shadow: 0 -10px 30px rgba(0, 0, 0, .55); }
+/* build 91: the list sits UNDER the field, in the card's flow (it floated above
+   it, where an iPhone keyboard and the card's top could hide it) */
+.q-who-list { position: static; margin: 6px 0 0; padding: 6px;
+  list-style: none; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; border-radius: 12px; background: #1b1b1f;
+  border: 1px solid var(--q-edge-hi); }
 .q-who-list[hidden] { display: none; }
 .q-who-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px;
-  border-radius: 8px; font-size: 15px; color: var(--white); cursor: pointer; }
+  min-height: 46px; border-radius: 8px; font-size: 16px; color: var(--white); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.q-who-item + .q-who-item { border-top: 1px solid rgba(255, 255, 255, .06); }
+.q-who-item b { font-weight: 700; color: var(--orange); }
+.q-who-item:active { background: var(--q-glass-hi); }
+.q-who-none { padding: 12px; font-size: 13.5px; line-height: 1.45; color: var(--q-dim); }
+/* build 91: on a phone, while the company is typed, the card keeps only the
+   field and the list, above the keyboard (lineflow.js picking()) */
+.q-who-card { max-height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+.q-who-card.is-picking > .q-k, .q-who-card.is-picking > h3, .q-who-card.is-picking .q-who-opts,
+.q-who-card.is-picking .q-who-fmt, .q-who-card.is-picking .q-who-acts, .q-who-card.is-picking .q-who-note { display: none; }
+.q-who-card.is-picking .q-who-co { margin-top: 0; }
 .q-who-item:hover, .q-who-item.is-hi { background: var(--q-glass-hi); }
 .q-who-item em { font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--orange);
   white-space: nowrap; }
 .q-who-note { font-size: 12px; line-height: 1.45; color: var(--q-faint); }
 .q-who-acts { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px; }
+/* build 90: send it as the PDF or a post (two tiles side by side) */
+.q-who-fmt { margin-top: 16px; }
+.q-who-fmt .q-k { margin: 0 0 8px; }
+.q-who-fmt-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.q-who-fmt-opts .q-who-opt { padding: 12px 13px; }
+.q-who-fmt-opts .q-who-opt b { font-size: 14.5px; }
+.q-who-fmt-opts .q-who-opt span { font-size: 12px; }
+/* build 90: the WhatsApp post sheet (js/post.js) */
+.q-post-card { max-height: 92vh; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain; }
+.q-post-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.q-post-head h3 { margin-bottom: 12px; }
+.q-post-x { flex: none; width: 36px; height: 36px; border-radius: 50%; font: inherit; font-size: 22px; line-height: 1;
+  color: var(--white); background: var(--q-glass); border: 1px solid var(--q-edge); cursor: pointer; }
+.q-post-chips { display: flex; gap: 8px; margin-bottom: 12px; }
+.q-post-chip { height: 30px; padding: 0 14px; border-radius: 15px; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--q-dim); background: var(--q-glass); border: 1px solid var(--q-edge); cursor: pointer; }
+.q-post-chip[aria-pressed="true"] { color: var(--white); border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 14%, transparent); }
+.q-post-shot { border-radius: 12px; overflow: hidden; background: #fff; min-height: 60px; }
+.q-post-shot img { display: block; width: 100%; height: auto; }
+.q-post-shot .q-who-note { margin: 0; padding: 18px 14px; background: #111; }
+.q-post-check { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; font-size: 14px; color: var(--q-dim); cursor: pointer; }
+.q-post-check input { width: 18px; height: 18px; accent-color: var(--orange); }
+.q-post-agent { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.q-post-agent[hidden] { display: none; }
+.q-post-agent input { width: 100%; min-width: 0; font-size: 16px; }
+.q-post-text { display: block; width: 100%; margin-top: 14px; padding: 12px 13px; border-radius: 12px; resize: vertical;
+  font: inherit; font-size: 15px; line-height: 1.55; color: var(--white); background: var(--q-glass); border: 1px solid var(--q-edge); }
+.q-post-text:focus { outline: none; border-color: var(--q-edge-hi); }
+.q-post-acts .q-ghost { min-height: 48px; }
+.q-post-note { margin: 10px 0 0; }
+.q-post-note:empty { display: none; }
 .q-assume { margin: 18px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.55; color: var(--q-faint); }
 .q-empty { margin-top: 14px; font-size: 13.5px; color: var(--q-dim); }
 .q-src { margin-top: 26px; }

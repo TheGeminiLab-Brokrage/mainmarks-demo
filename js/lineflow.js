@@ -894,6 +894,16 @@
            the quotation): a broker's special request, counted for that
            company, or a general broadcast. Then it goes. */
         askAudience(function (who) {
+          /* build 90: or as a WhatsApp POST (js/post.js): a picture and a
+             caption, the Ayyam / Qomor way, for groups */
+          if (who.format === 'post' && MM.post) {
+            MM.post.open({
+              project: p, line: l, unit: c.u, plan: c.pl, buildingName: c.b && c.b.name, who: who,
+              session: session, demo: demo,
+              kit: { handheld: handheld, canShare: canShare, shareOrTimeOut: shareOrTimeOut, saveFile: saveFile }
+            });
+            return;
+          }
           /* build 83: inside the demo's phone (demo.html), the demo's own
              phone screens answer: its share sheet, the chat, the PDF. */
           if (demo) {
@@ -905,7 +915,7 @@
             return;
           }
           deliver(made, offerText());       /* still inside the Continue tap */
-        }, { ready: ready });
+        }, { ready: ready, withPdf: withPdf });
       });
       /* the offer leaves the app. A phone: the PDF (and the text) through its
          share sheet. A laptop: WhatsApp Web with the text, and the PDF saved to
@@ -1012,38 +1022,156 @@
       if (!list.length) co.appendChild(el('span', 'q-who-note', t('Main Marks’ brokerage list will fill this once it is sent. Type the company for now.')));
       card.appendChild(co);
 
+      /* build 90: SEND IT AS the offer PDF or a WhatsApp post (Muhanad,
+         2026-10-03: the post beside the PDF, as Ayyam and Qomor have it).
+         Until the salesperson picks, it follows the answer above: a broker's
+         request gets the PDF, a broadcast gets the post. */
+      var fmtBox = el('div', 'q-who-fmt');
+      fmtBox.appendChild(el('p', 'q-k', t('Send it as')));
+      var fmtOpts = el('div', 'q-who-fmt-opts');
+      function fmtOpt(f, title, sub) {
+        var b = el('button', 'q-who-opt'); b.type = 'button'; b.dataset.f = f;
+        b.setAttribute('aria-pressed', 'false');
+        b.appendChild(el('b', null, t(title))); b.appendChild(el('span', null, t(sub)));
+        b.addEventListener('click', function () { setFormat(f, true); });
+        fmtOpts.appendChild(b);
+        return b;
+      }
+      fmtOpt('pdf', 'Offer PDF', how && how.withPdf === false ? 'Text only: no PDF for this unit yet' : 'The 6-page offer, for one broker');
+      fmtOpt('post', 'WhatsApp post', 'A picture and text, for groups');
+      fmtBox.appendChild(fmtOpts);
+      card.appendChild(fmtBox);
+      var format = null, fmtPicked = false;
+      function setFormat(f, byHand) {
+        format = f;
+        if (byHand) fmtPicked = true;
+        [].forEach.call(fmtOpts.children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.f === f)); });
+        check();
+      }
+
       var names = asked && list.indexOf(asked) > 0 ? [asked].concat(list.filter(function (n) { return n !== asked; })) : list;
       var hi = -1;
+      /* build 91 (Muhanad: "every letter he types, the list filters to
+         whatever is close to what he is typing"): FORGIVING matching. Case,
+         spaces and punctuation are ignored and Arabic letter forms folded
+         (أ إ آ -> ا, ة -> ه, ى -> ي), then, best first: the name starts with
+         it, a word in it does ("banker"), it is inside it, its letters come
+         in order ("nwy" -> Nawy), or it is one slip away ("nawi" -> Nawy; two
+         for six letters or more). Nothing close: the list says so, and the
+         name is kept as typed. */
+      function fold(s) {
+        var out = '', low = String(s).toLowerCase();
+        for (var i = 0; i < low.length; i++) {
+          var c = low.charCodeAt(i);
+          if (c === 0x623 || c === 0x625 || c === 0x622) c = 0x627;
+          else if (c === 0x629) c = 0x647;
+          else if (c === 0x649) c = 0x64A;
+          if ((c >= 0x61 && c <= 0x7a) || (c >= 0x30 && c <= 0x39) || (c >= 0x621 && c <= 0x64A && c !== 0x640)) out += String.fromCharCode(c);
+        }
+        return out;
+      }
+      function slips(a, b) {                 /* edit distance */
+        var prev = [], cur, i, j;
+        for (j = 0; j <= b.length; j++) prev[j] = j;
+        for (i = 1; i <= a.length; i++) {
+          cur = [i];
+          for (j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+          prev = cur;
+        }
+        return prev[b.length];
+      }
+      var folded = {};
+      names.forEach(function (n) {
+        folded[n] = { all: fold(n), words: String(n).split(/[\s\-_.,&/()]+/).map(fold).filter(Boolean) };
+      });
+      function score(n, q) {
+        var f = folded[n], all = f.all, words = f.words, i, j;
+        if (all.indexOf(q) === 0) return 100;
+        if (words.some(function (w) { return w.indexOf(q) === 0; })) return 90;
+        if (all.indexOf(q) > 0) return 80;
+        var heads = [all].concat(words);
+        if (q.length >= 2 && heads.some(function (h) {
+          if (h[0] !== q[0]) return false;
+          for (i = 0, j = 0; i < h.length && j < q.length; i++) if (h[i] === q[j]) j++;
+          return j === q.length;
+        })) return 60;
+        if (q.length >= 3) {
+          var allow = q.length >= 6 ? 2 : 1, best = 9;
+          heads.forEach(function (h) {
+            for (var L = q.length - 1; L <= q.length + 1; L++) if (L > 0 && L <= h.length) best = Math.min(best, slips(q, h.slice(0, L)));
+          });
+          if (best <= allow) return 50 - best * 5;
+        }
+        return -1;
+      }
       function matches() {
-        var s = inp.value.trim().toLowerCase();
-        if (!s) return names;
-        /* the companies that START with what was typed first, then the rest that contain it */
-        var starts = names.filter(function (n) { return n.toLowerCase().indexOf(s) === 0; });
-        return starts.concat(names.filter(function (n) { return n.toLowerCase().indexOf(s) > 0; }));
+        var q = fold(inp.value);
+        if (!q) return names;
+        return names.map(function (n, k) { return { n: n, s: score(n, q), k: k }; })
+          .filter(function (r) { return r.s > 0; })
+          .sort(function (a, b) { return b.s - a.s || a.k - b.k; })
+          .map(function (r) { return r.n; });
+      }
+      /* the typed letters in bold inside the name, where they appear as typed */
+      function nameLabel(n) {
+        var span = el('span'), q = inp.value.trim(), at = q ? n.toLowerCase().indexOf(q.toLowerCase()) : -1;
+        if (at < 0) { span.textContent = n; return span; }
+        span.appendChild(document.createTextNode(n.slice(0, at)));
+        span.appendChild(el('b', null, n.slice(at, at + q.length)));
+        span.appendChild(document.createTextNode(n.slice(at + q.length)));
+        return span;
+      }
+      /* build 91, ON A PHONE the keyboard covers the bottom of the screen and a
+         fixed sheet stays behind it. While the company is typed the card keeps
+         only the question, the field and the list (class is-picking), the sheet
+         is fitted to the part of the screen the keyboard leaves
+         (visualViewport), and the list takes the rest of that space. */
+      var phone = handheld(), vv = root.visualViewport;
+      function fitView() {
+        if (!vv) return;
+        box.style.top = vv.offsetTop + 'px';
+        box.style.height = vv.height + 'px';
+        box.style.bottom = 'auto';
+      }
+      function picking(on) {
+        card.classList.toggle('is-picking', !!(on && phone));
+        if (on && phone) card.scrollTop = 0;
       }
       function paintDrop(open) {
-        var m = matches();
+        var m = matches(), typed = inp.value.trim();
         drop.textContent = '';
-        if (!open || !m.length || (m.length === 1 && m[0] === inp.value.trim())) {
+        if (!open || (m.length === 1 && m[0] === typed)) {
           drop.hidden = true; inp.setAttribute('aria-expanded', 'false'); return;
+        }
+        if (!m.length) {
+          drop.appendChild(el('li', 'q-who-none', t('No company in the list is close to “') + typed + t('”. It will be kept as typed.')));
         }
         if (hi >= m.length) hi = m.length - 1;
         m.forEach(function (n, i) {
           var li = el('li', 'q-who-item' + (i === hi ? ' is-hi' : ''));
           li.setAttribute('role', 'option'); li.dataset.name = n;
-          li.appendChild(el('span', null, n));
+          li.appendChild(nameLabel(n));
           if (n === asked) li.appendChild(el('em', null, t('Sent the request')));
           /* pointerdown, not click: the field's blur would close the list first */
           li.addEventListener('pointerdown', function (e) { e.preventDefault(); pickName(n); });
           drop.appendChild(li);
         });
+        if (phone) {
+          var room = (vv ? vv.height : root.innerHeight) - 200;
+          drop.style.maxHeight = Math.max(150, Math.min(380, room)) + 'px';
+        }
         drop.hidden = false; inp.setAttribute('aria-expanded', 'true');
       }
-      function pickName(n) { inp.value = n; hi = -1; paintDrop(false); check(); }
-      inp.addEventListener('focus', function () { paintDrop(true); });
-      inp.addEventListener('click', function () { paintDrop(true); });   /* a tap on a field that already has focus */
-      inp.addEventListener('input', function () { hi = -1; paintDrop(true); });
-      inp.addEventListener('blur', function () { setTimeout(function () { paintDrop(false); }, 120); });
+      function pickName(n) {
+        inp.value = n; hi = -1; paintDrop(false); check();
+        picking(false);                      /* the whole card comes back, with Continue */
+        if (phone) inp.blur();               /* and the keyboard goes */
+      }
+      inp.addEventListener('focus', function () { picking(true); paintDrop(true); });
+      inp.addEventListener('click', function () { picking(true); paintDrop(true); });   /* a tap on a field that already has focus */
+      /* the best match is lit as you type, so Enter / Go picks it */
+      inp.addEventListener('input', function () { picking(true); hi = inp.value.trim() ? 0 : -1; paintDrop(true); });
+      inp.addEventListener('blur', function () { setTimeout(function () { paintDrop(false); picking(false); }, 120); });
       inp.addEventListener('keydown', function (e) {
         var m = matches();
         if (e.key === 'ArrowDown') { e.preventDefault(); hi = Math.min(m.length - 1, hi + 1); paintDrop(true); }
@@ -1057,10 +1185,9 @@
       var go2 = el('button', 'q-cta', t('Continue to WhatsApp')); go2.type = 'button';
       var pending = !!(how && how.ready);
       if (pending) {
-        go2.textContent = t('Preparing the offer PDF…');
-        how.ready.then(function () { pending = false; go2.textContent = t('Continue to WhatsApp'); check(); },
+        how.ready.then(function () { pending = false; check(); },
           function () {
-            pending = false; go2.textContent = t('Continue to WhatsApp'); check();
+            pending = false; check();
             card.insertBefore(el('p', 'q-who-note', t('The offer PDF could not be made, so the text goes alone.')), acts);
           });
       }
@@ -1074,26 +1201,35 @@
         [].forEach.call(opts.children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.a === a)); });
         co.hidden = a !== 'broker';
         if (a === 'broker' && !inp.value && !asked) inp.value = (last && last.audience === 'broker' && last.company) || '';
+        if (!fmtPicked) setFormat(a === 'broker' ? 'pdf' : 'post', false);
         check();
       }
-      function check() { go2.disabled = pending || !audience || (audience === 'broker' && !inp.value.trim()); }
+      function check() {
+        var waitPdf = pending && format === 'pdf';
+        go2.textContent = waitPdf ? t('Preparing the offer PDF…') : format === 'post' ? t('Make the post') : t('Continue to WhatsApp');
+        go2.disabled = waitPdf || !audience || !format || (audience === 'broker' && !inp.value.trim());
+      }
       inp.addEventListener('input', check);
       function close() {
         box.classList.remove('in');
         setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 300);
         document.removeEventListener('keydown', onKey);
+        if (vv) { vv.removeEventListener('resize', fitView); vv.removeEventListener('scroll', fitView); }
       }
+      if (vv && phone) { vv.addEventListener('resize', fitView); vv.addEventListener('scroll', fitView); fitView(); }
       function onKey(e) { if (e.key === 'Escape') close(); }
       cancel.addEventListener('click', close);
       dim.addEventListener('click', close);
       document.addEventListener('keydown', onKey);
       go2.addEventListener('click', function () {
-        var who = { audience: audience, company: audience === 'broker' ? inp.value.trim() : null };
+        var who = { audience: audience, company: audience === 'broker' ? inp.value.trim() : null, format: format };
         try { sessionStorage.setItem(AUD_KEY, JSON.stringify(who)); } catch (e) {}
         close();
         then(who);
       });
 
+      /* not in the demo (a request on its lock screen): Watch it must always get the PDF */
+      if (last && last.format && !asked) setFormat(last.format, true);
       if (last && !asked) choose(last.audience); else check();
       document.body.appendChild(box);
       void box.offsetWidth;

@@ -14,7 +14,7 @@ const CONFIG = {
   /* Bumped on every deploy, and matched by the ?v= on every script tag in
      the HTML. That pair is what stops a returning phone running yesterday's
      JavaScript. See README, "Deploying". */
-  build: 89,
+  build: 91,
 
   /* Where the activity log is sent. Empty = kept on the device only, which
      is where it is today. Filling this in is the whole change when the
@@ -655,6 +655,11 @@ const CONFIG = {
          offer, whatever the page asks. `art` = PDF-ready copies (jsPDF takes
          PNG/JPEG only): logos rasterised from the CI vectors at 1400 px; the
          drawings flattened from the WebP files above, nothing redrawn. */
+      /* build 90: the WhatsApp post (js/post.js). `sample` stamps the picture
+         and opens the caption with a SAMPLE line, as the PDF is stamped: the
+         down payment rests on terms.downOn, which Main Marks has not
+         confirmed. Turn it off the day they do. */
+      post: { sample: true },
       offer: {
         scope: { types: ['Clinic'], floors: ['first'], buildings: ['E02'] },
         art: {
