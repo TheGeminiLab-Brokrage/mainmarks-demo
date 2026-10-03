@@ -354,6 +354,25 @@
         selectUnit(u.code);
         go(s3);                                      /* the drawing first: the unit glows there */
       });
+      /* build 96: "Send these options". The finder's cards leave as ONE
+         WhatsApp post (js/post.js), after the same question as every offer:
+         who is it for. Fail closed: every unit is checked again here. */
+      finder.onSendOptions(function (list) {
+        if (!MM.post || !MM.post.captionOptions) return;
+        var opts = list.map(function (x) {
+          var b = byKey(x.u.building);
+          return { unit: x.u, role: x.role, buildingName: b && b.name,
+                   plan: x.plan ? (p.plans || []).filter(function (q) { return q.id === x.plan; })[0] || null : null };
+        });
+        if (opts.length < 2 || opts.some(function (x) { return !x.unit.sellable; })) return;
+        var demo = demoPhone();
+        askAudience(function (who) {
+          MM.post.open({
+            project: p, line: l, options: opts, all: rows, who: who, session: session, demo: demo,
+            kit: { handheld: handheld, canShare: canShare, shareOrTimeOut: shareOrTimeOut, saveFile: saveFile }
+          });
+        }, { postOnly: true });
+      });
     }
     function paint() {
       var on = search.active;
@@ -1059,6 +1078,9 @@
       fmtOpt('post', 'WhatsApp post', 'A picture and text, for groups');
       fmtBox.appendChild(fmtOpts);
       card.appendChild(fmtBox);
+      /* build 96: several options go as a post only, so there is nothing to choose */
+      var postOnly = !!(how && how.postOnly);
+      fmtBox.hidden = postOnly;
       var format = null, fmtPicked = false;
       function setFormat(f, byHand) {
         format = f;
@@ -1241,13 +1263,16 @@
       document.addEventListener('keydown', onKey);
       go2.addEventListener('click', function () {
         var who = { audience: audience, company: audience === 'broker' ? inp.value.trim() : null, format: format };
-        try { sessionStorage.setItem(AUD_KEY, JSON.stringify(who)); } catch (e) {}
+        /* a post-only send does not change how the next single offer is sent */
+        var keep = postOnly ? { audience: who.audience, company: who.company, format: (last && last.format) || null } : who;
+        try { sessionStorage.setItem(AUD_KEY, JSON.stringify(keep)); } catch (e) {}
         close();
         then(who);
       });
 
       /* not in the demo (a request on its lock screen): Watch it must always get the PDF */
-      if (last && last.format && !asked) setFormat(last.format, true);
+      if (postOnly) setFormat('post', true);
+      else if (last && last.format && !asked) setFormat(last.format, true);
       if (last && !asked) choose(last.audience); else check();
       document.body.appendChild(box);
       void box.offsetWidth;

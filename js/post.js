@@ -327,6 +327,285 @@
       });
   }
 
+  /* ============================================== several options (build 96)
+
+     "Send these options" (Muhanad, 2026-10-03, after a mock-up he approved):
+     the cards Find a unit answers with — the answer, the best value, the
+     stretch — leave as ONE post, so the advice reaches the broker and the
+     dearer unit is in front of the client with its exact extra cost.
+
+       picture  the master plan with the building lit; under it the floor
+                drawing with every option in orange. The numbers sit just
+                OUTSIDE the drawing, level with their unit: on the unit they
+                covered the drawing's own code and size. Only when every
+                option is traced on ONE floor drawing; otherwise text alone.
+       caption  what the options share (floor, plan) once on top; then each
+                option: code, size, why it is there, price, instalment.
+
+     Rules kept from the single post: every figure from MM.plans.schedule;
+     no price on the picture; SAMPLE while config says so; fail closed.
+     Filters only (the By unit tab) carry no plan: the price alone. */
+  var KEYCAP = ['1', '2', '3', '4'].map(function (d) { return d + String.fromCharCode(0xFE0F, 0x20E3); });
+  var OPT = {
+    en: {
+      head: function (n) { return '🔥 ' + n + ' options for your client 🔥'; },
+      where: function (f, b) { return '🔷 ' + f + ' · Building ' + b; },
+      planLine: function (s, pl) {
+        if (s.cash) return '💰 ' + pctOf(s.discountPct) + '% off · cash';
+        return '💰 ' + (s.discount ? pctOf(s.discountPct) + '% off · ' : '') + (pl.down ? pctOf(pl.down) + '% down' : 'No down payment') + ' · ' + pl.years + ' years to pay';
+      },
+      unit: function (i, u) { return KEYCAP[i] + ' 📍*' + u.code + '* · ' + (USE_EN[u.type] || u.type) + ' ' + money(u.area) + ' m²'; },
+      role: { fit: '✅ Fits the budget', cheapest: '✅ Lowest price', value: '✅ Lowest price per m²', lower: '✅ Lower price', stretch: '⬆️ A step up' },
+      twins: function (c) { return ' (also ' + c.join(', ') + ')'; },
+      stepQ: function (m2, v) { return ': ' + m2 + ' m² more for EGP ' + v + ' more every 3 months'; },
+      stepC: function (m2, v) { return ': ' + m2 + ' m² more for EGP ' + v + ' more'; },
+      stepM: function (m2) { return ': ' + m2 + ' m² more'; },
+      price: function (v) { return '👈 Price EGP ' + v; },
+      before: function (v) { return '👈 Price before discount ~' + v + '~'; },
+      after: function (v) { return '👈 Price after discount EGP ' + v; },
+      cash: '👈 *One payment, in cash*',
+      down: function (v) { return '👈 Down payment EGP ' + v; },
+      quarter: function (v, m) { return '👈 *Every 3 months EGP ' + v + '* (about ' + m + ' a month)'; },
+      picRole: { fit: 'Fits the budget', cheapest: 'Lowest price', value: 'Lowest price per m²', lower: 'Lower price', stretch: 'A step up in size' },
+      picHead: function (n, u) { return n + ' ' + (USE_EN[u.type] || u.type).toUpperCase() + ' OPTIONS'; }
+    },
+    ar: {
+      head: function (n) { return '🔥 ' + n + ' اختيارات لعميلك 🔥'; },
+      where: function (f, b) { return '🔷 ' + f + ' · مبنى ' + b; },
+      planLine: function (s, pl) {
+        if (s.cash) return '💰 خصم ' + isoPct(s.discountPct) + ' كاش';
+        return '💰 ' + (s.discount ? 'خصم ' + isoPct(s.discountPct) + ' و' : '') + 'تقسيط على ' + pl.years + (pl.years <= 10 ? ' سنين ' : ' سنة ') + (pl.down ? 'بمقدم ' + isoPct(pl.down) : 'بدون مقدم');
+      },
+      unit: function (i, u) { return KEYCAP[i] + ' 📍*' + u.code + '* · ' + (USE_AR[u.type] || u.type) + ' ' + money(u.area) + ' متر'; },
+      role: { fit: '✅ الأنسب للميزانية', cheapest: '✅ أقل سعر', value: '✅ أقل سعر للمتر', lower: '✅ سعر أقل', stretch: '⬆️ خطوة أعلى' },
+      twins: function (c) { return ' (ومثلها ' + c.join(' و') + ')'; },
+      stepQ: function (m2, v) { return ': مساحة أكبر بـ ' + m2 + ' متر بزيادة ' + v + ' كل 3 شهور'; },
+      stepC: function (m2, v) { return ': مساحة أكبر بـ ' + m2 + ' متر بزيادة ' + v; },
+      stepM: function (m2) { return ': مساحة أكبر بـ ' + m2 + ' متر'; },
+      price: function (v) { return '👈 السعر ' + v; },
+      before: function (v) { return '👈 السعر قبل الخصم ~' + v + '~'; },
+      after: function (v) { return '👈 السعر بعد الخصم ' + v; },
+      cash: '👈 *الدفع كاش مرة واحدة*',
+      down: function (v) { return '👈 مقدم ' + v; },
+      quarter: function (v, m) { return '👈 *قسط كل 3 شهور ' + v + '* (حوالي ' + m + ' في الشهر)'; },
+      picRole: { fit: 'الأنسب للميزانية', cheapest: 'أقل سعر', value: 'أقل سعر للمتر', lower: 'سعر أقل', stretch: 'مساحة أكبر' },
+      /* several of them: the plural */
+      picHead: function (n, u) { return n + ' اختيارات · ' + ({ Clinic: 'عيادات', Admin: 'مكاتب إدارية', Commercial: 'محلات تجارية' }[u.type] || u.type); }
+    }
+  };
+  /* "Lowest price per m²" is a thin claim when the gap is a few pounds
+     (E125 beats E124 by EGP 33 a metre): under 1% apart, and cheaper in
+     total, the broker is told the plain thing — it costs less. */
+  var THIN = 0.01;
+  function roleOf(x, first) {
+    if (x.role !== 'value') return x.role;
+    var a = x.unit.listPrice / x.unit.area, b = first.unit.listPrice / first.unit.area;
+    return (b - a) / b < THIN && x.unit.listPrice < first.unit.listPrice ? 'lower' : 'value';
+  }
+  function samePlace(opts) {
+    return opts.every(function (x) { return x.unit.fid === opts[0].unit.fid && x.unit.building === opts[0].unit.building; });
+  }
+
+  /* o: { project, line, options:[{unit, plan|null, role, buildingName}], all:[units], lang, agent, date } */
+  function captionOptions(o) {
+    var p = o.project, L = o.lang === 'en' ? 'en' : 'ar', X = OPT[L], T = TEXT[L], opts = o.options || [];
+    var FL = L === 'en' ? FLOOR_EN : FLOOR_AR, when = o.date || new Date();
+    if (opts.length < 2 || opts.length > KEYCAP.length) throw new Error('a post of options needs two to four units');
+    var S = opts.map(function (x) {
+      var u = x.unit, pl = x.plan;
+      if (!u || !u.sellable) throw new Error('unit ' + (u && u.code) + ' is not available, so it cannot be posted');
+      if (!pl) return null;
+      if (!MM.plans.applicable(p.plans, u.type, when).some(function (q) { return q.id === pl.id; })) {
+        throw new Error('the plan ' + pl.label + ' is not offered on ' + u.code + ' today');
+      }
+      var s = MM.plans.schedule({ listPrice: u.listPrice, discount: pl.discount || 0, plan: pl, terms: p.terms || {}, from: when });
+      if (!s) throw new Error('no schedule could be worked for ' + u.code);
+      if (s.broken) throw new Error('the schedule of ' + u.code + ' does not add up: ' + s.broken.join('; '));
+      return s;
+    });
+    var planned = S.every(Boolean);
+    if (!planned && S.some(Boolean)) throw new Error('some options have a plan and some do not');
+    var onePlan = planned && opts.every(function (x) { return x.plan.id === opts[0].plan.id; });
+    var onePlace = samePlace(opts);
+    var codes = opts.map(function (x) { return x.unit.code; });
+
+    var lines = [];
+    if (p.post && p.post.sample) lines.push(T.sample, '');
+    lines.push(X.head(opts.length));
+    lines.push('✨ ' + ((o.line && o.line.name) || p.name) + ' ✨');
+    if (onePlace) lines.push(X.where(FL[opts[0].unit.fid] || opts[0].unit.floor, bLetter(opts[0].buildingName, opts[0].unit)));
+    if (onePlan) lines.push(X.planLine(S[0], opts[0].plan));
+    opts.forEach(function (x, i) {
+      var u = x.unit, s = S[i], u0 = opts[0].unit, role = X.role[roleOf(x, opts[0])];
+      if (x.role === 'stretch') {
+        var m2 = money(u.area - u0.area);
+        role += !planned ? X.stepC(m2, money(u.listPrice - u0.listPrice))
+          : !onePlan ? X.stepM(m2)
+          : s.cash ? X.stepC(m2, money(s.payable - S[0].payable)) : X.stepQ(m2, money(s.each - S[0].each));
+      } else {
+        /* identical units still for sale: the broker's backups */
+        var tw = (o.all || []).filter(function (y) {
+          return y.sellable && codes.indexOf(y.code) < 0 && y.listPrice === u.listPrice && y.area === u.area && y.fid === u.fid && y.building === u.building;
+        }).map(function (y) { return y.code; });
+        if (tw.length) role += X.twins(tw);
+      }
+      lines.push('', X.unit(i, u), role);
+      if (!onePlace) lines.push(X.where(FL[u.fid] || u.floor, bLetter(x.buildingName, u)));
+      if (!s) { lines.push(X.price(money(u.listPrice))); return; }
+      if (!onePlan) lines.push(X.planLine(s, x.plan));
+      if (s.discount) lines.push(X.before(money(s.list)), X.after(money(s.payable))); else lines.push(X.price(money(s.payable)));
+      if (s.cash) lines.push(X.cash);
+      else {
+        if (s.down) lines.push(X.down(money(s.down)));
+        lines.push(X.quarter(money(s.each), money(Math.ceil(Math.max(s.each, s.lastInstalment || 0) / (s.everyMonths || 3)))));
+      }
+    });
+    var until = planned ? opts.map(function (x) { return x.plan.until; }).filter(Boolean).sort()[0] : null;
+    if (until) lines.push('', T.until(new Date(until + 'T12:00:00')));
+    if (o.agent && (o.agent.name || o.agent.phone)) {
+      lines.push('', T.contact((o.agent.name || '').trim(), (o.agent.phone || '').trim()));
+    }
+    return lines.join('\n');
+  }
+
+  /* one picture needs every option traced on the SAME floor drawing */
+  function canPictureOptions(p, opts) {
+    return !!(opts && opts.length > 1 && samePlace(opts) && opts.every(function (x) { return canPicture(p, x.unit); }));
+  }
+
+  /* o: { project, options, lang } -> Promise<Blob> */
+  function pictureOptions(o) {
+    var p = o.project, opts = o.options, AR_PIC = o.lang === 'ar', L = AR_PIC ? 'ar' : 'en', W8 = PIC[L], X = OPT[L];
+    if (!canPictureOptions(p, opts)) return Promise.reject(new Error('These units are not all on one traced drawing'));
+    var u0 = opts[0].unit, a = p.offer.art, box = p.plates[u0.building][u0.fid], R = p.offer.masterFromFloor;
+    var fontsReady = root.document && document.fonts && document.fonts.load
+      ? Promise.all(['600 100px Manrope', '500 30px Manrope', '700 22px Manrope', '600 30px "IBM Plex Sans Arabic"', '500 30px "IBM Plex Sans Arabic"']
+          .map(function (f) { return document.fonts.load(f, AR_PIC ? 'عيادة' : 'A'); })).catch(function () {})
+      : Promise.resolve();
+    return Promise.all([loadImage(a.master), loadImage(a.plates[u0.building][u0.fid]), loadImage(a.floors[u0.fid]),
+      a.logoOrange ? loadImage(a.logoOrange) : Promise.resolve(null), fontsReady])
+      .then(function (g) {
+        var master = g[0], plate = g[1], plan = g[2], logo = g[3];
+        var W = 1200, F = '"Manrope", "IBM Plex Sans Arabic", "Segoe UI", Arial, sans-serif';
+        var letter = bLetter(opts[0].buildingName, u0);
+        var ms = W / master.naturalWidth, MH = Math.round(master.naturalHeight * ms);
+        var bw = box[2] - box[0], bh = box[3] - box[1];
+        var PAD = 44, GAP = 40, DH = 860, DW = Math.round(DH * bw / bh);
+        var H = MH + PAD + DH + PAD;
+        var cv = document.createElement('canvas');
+        cv.width = W; cv.height = H;
+        var ctx = cv.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        if (AR_PIC && 'direction' in ctx) ctx.direction = 'rtl';
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(master, 0, 0, W, MH);
+
+        /* the building lit on the whole master plan, one pin on it */
+        var toM = function (x, y) { return [(R.s * x + R.tx) * ms, (R.s * y + R.ty) * ms]; };
+        var e0 = toM(box[0], box[1]), e1 = toM(box[2], box[3]);
+        ctx.fillStyle = 'rgba(255,255,255,.55)';
+        ctx.fillRect(0, 0, W, e0[1]);
+        ctx.fillRect(0, e1[1], W, MH - e1[1]);
+        ctx.fillRect(0, e0[1], e0[0], e1[1] - e0[1]);
+        ctx.fillRect(e1[0], e0[1], W - e1[0], e1[1] - e0[1]);
+        ctx.strokeStyle = ORANGE; ctx.lineWidth = 5;
+        ctx.strokeRect(e0[0], e0[1], e1[0] - e0[0], e1[1] - e0[1]);
+        var tag = W8.building(letter);
+        ctx.font = '700 22px ' + F;
+        var tw = ctx.measureText(tag).width + 28, tx = e0[0] - tw - 12, ty = e0[1] + 6;
+        if (tx < 12) tx = e1[0] + 12;
+        ctx.fillStyle = ORANGE;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(tx, ty, tw, 38, 19); else ctx.rect(tx, ty, tw, 38);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+        ctx.fillText(tag, tx + 14, ty + 20);
+        pin(ctx, (e0[0] + e1[0]) / 2, (e0[1] + e1[1]) / 2, 64, ORANGE);
+        ctx.fillStyle = RULE; ctx.fillRect(0, MH, W, 2);
+
+        function badge(x, y, r, n) {
+          ctx.save();
+          if ('direction' in ctx) ctx.direction = 'ltr';
+          ctx.fillStyle = ORANGE; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = r / 7; ctx.stroke();
+          ctx.fillStyle = '#FFFFFF'; ctx.font = '700 ' + Math.round(r * 1.15) + 'px ' + F;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(String(n), x, y + r * 0.06);
+          ctx.restore();
+        }
+
+        /* the floor drawing (right): every option in orange, its number beside it */
+        var top = MH + PAD, dx = W - PAD - DW;
+        ctx.drawImage(plate, dx, top, DW, DH);
+        ctx.strokeStyle = RULE; ctx.lineWidth = 2; ctx.strokeRect(dx, top, DW, DH);
+        opts.forEach(function (x, i) {
+          var shape = p.unitShapes[x.unit.code];
+          var pts = shape.map(function (q) { return [dx + (q[0] - box[0]) / bw * DW, top + (q[1] - box[1]) / bh * DH]; });
+          poly(ctx, pts); ctx.fillStyle = 'rgba(250,97,38,.42)'; ctx.fill();
+          poly(ctx, pts); ctx.strokeStyle = ORANGE; ctx.lineWidth = 4; ctx.stroke();
+          var cx = shape.reduce(function (s, q) { return s + q[0]; }, 0) / shape.length;
+          var cy = shape.reduce(function (s, q) { return s + q[1]; }, 0) / shape.length;
+          badge(cx < (box[0] + box[2]) / 2 ? dx - 21 : dx + DW + 21, top + (cy - box[1]) / bh * DH, 17, i + 1);
+        });
+
+        /* the left column: the logo, what they share, one row per option, the key plan */
+        var lx = PAD, lw = dx - GAP - PAD, y = top;
+        if (logo) {
+          var lgw = Math.min(lw, 300), lgh = lgw * logo.naturalHeight / logo.naturalWidth;
+          ctx.drawImage(logo, lx, y, lgw, lgh);
+          y += lgh + 50;
+        }
+        ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+        ctx.fillStyle = GREY; ctx.font = (AR_PIC ? '600 26px ' : '700 22px ') + F;
+        if ('letterSpacing' in ctx && !AR_PIC) ctx.letterSpacing = '4px';
+        ctx.fillText(X.picHead(opts.length, u0), lx, y + 22);
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+        ctx.font = '500 30px ' + F;
+        ctx.fillText(W8.where(u0, letter), lx, y + 66);
+        y += 104;
+        var ROW = 132;
+        opts.forEach(function (x, i) {
+          ctx.fillStyle = RULE; ctx.fillRect(lx, y, lw, 2);
+          badge(lx + 30, y + ROW / 2 + 1, 30, i + 1);
+          ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+          ctx.save();
+          if ('direction' in ctx) ctx.direction = 'ltr';
+          ctx.fillStyle = TEAL; ctx.font = '600 62px ' + F;
+          ctx.fillText(x.unit.code, lx + 82, y + 66);
+          var cw = ctx.measureText(x.unit.code).width;
+          ctx.restore();
+          ctx.fillStyle = CHAR; ctx.font = '500 34px ' + F;
+          ctx.fillText(W8.area(x.unit), lx + 82 + cw + 22, y + 64);
+          ctx.fillStyle = GREY; ctx.font = (AR_PIC ? '600 ' : '500 ') + '28px ' + F;
+          ctx.fillText(X.picRole[roleOf(x, opts[0])], lx + 82, y + 108);
+          y += ROW;
+        });
+        ctx.fillStyle = RULE; ctx.fillRect(lx, y, lw, 2);
+        y += 36;
+        var kh = top + DH - y, kw = kh * plan.naturalWidth / plan.naturalHeight;
+        if (kw > lw) { kw = lw; kh = kw * plan.naturalHeight / plan.naturalWidth; }
+        if (kh >= 150) {
+          var ky = top + DH - kh, ks = kw / plan.naturalWidth;
+          ctx.drawImage(plan, lx, ky, kw, kh);
+          ctx.strokeStyle = ORANGE; ctx.lineWidth = 3.5;
+          ctx.strokeRect(lx + box[0] * ks, ky + box[1] * ks, bw * ks, bh * ks);
+        }
+
+        if (p.post && p.post.sample) {
+          ctx.font = '700 22px ' + F;
+          var label = W8.sample, sw = ctx.measureText(label).width + 32;
+          ctx.fillStyle = ORANGE;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(16, 16, sw, 40, 20); else ctx.rect(16, 16, sw, 40);
+          ctx.fill();
+          ctx.fillStyle = '#FFFFFF'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(label, 32, 37);
+        }
+        return new Promise(function (ok, fail) {
+          cv.toBlob(function (b) { b ? ok(b) : fail(new Error('Could not make the picture.')); }, 'image/jpeg', 0.9);
+        });
+      });
+  }
+
   /* ================================================================ sheet */
 
   var AGENT_KEY = 'mm.agent';
@@ -337,9 +616,13 @@
   }
   function saveAgent(a) { try { localStorage.setItem(AGENT_KEY, JSON.stringify(a)); } catch (e) { /* not remembered */ } }
 
-  /* o: { project, line, unit, plan, buildingName, who, session, kit:{handheld, canShare, shareOrTimeOut, saveFile}, demo } */
+  /* o: { project, line, unit, plan, buildingName, who, session, kit:{handheld, canShare, shareOrTimeOut, saveFile}, demo }
+     build 96: or, in place of unit + plan, options:[{unit, plan|null, role, buildingName}] and all:[units] */
   function open(o) {
     var el = MM.el, t = MM.t, kit = o.kit;
+    var many = !!(o.options && o.options.length > 1);
+    var codes = many ? o.options.map(function (x) { return x.unit.code; }) : [o.unit.code];
+    var hasPic = many ? canPictureOptions(o.project, o.options) : canPicture(o.project, o.unit);
     var lang = MM.lang === 'ar' ? 'ar' : 'en';           /* the app's language (js/i18n.js) */
     var agent = readAgent((o.session && o.session.name) || '');
     var file = null, fileUrl = null;
@@ -352,8 +635,8 @@
     var hl = el('div');
     hl.appendChild(el('p', 'q-k', o.who && o.who.audience === 'broker' && o.who.company
       ? t('WhatsApp post') + ' · ' + o.who.company : t('WhatsApp post') + ' · ' + t('General broadcast')));
-    var h = el('h3', null, t('Clinic {code}', { code: o.unit.code })); h.id = 'qPostH';
-    if (o.unit.type !== 'Clinic') h.textContent = o.unit.code;
+    var h = el('h3', null, many ? t('{n} options', { n: codes.length }) + ' · ' + codes.join(', ') : t('Clinic {code}', { code: o.unit.code })); h.id = 'qPostH';
+    if (!many && o.unit.type !== 'Clinic') h.textContent = o.unit.code;
     hl.appendChild(h);
     head.appendChild(hl);
     var x = el('button', 'q-post-x', '×'); x.type = 'button'; x.setAttribute('aria-label', t('Close'));
@@ -392,8 +675,10 @@
     function flash(msg) { note.textContent = msg; }
     function writeText() {
       try {
-        ta.value = caption({ project: o.project, line: o.line, unit: o.unit, plan: o.plan, buildingName: o.buildingName,
-          lang: lang, agent: agentOn.checked ? { name: nameIn.value, phone: phoneIn.value } : null });
+        var ag = agentOn.checked ? { name: nameIn.value, phone: phoneIn.value } : null;
+        ta.value = many
+          ? captionOptions({ project: o.project, line: o.line, options: o.options, all: o.all, lang: lang, agent: ag })
+          : caption({ project: o.project, line: o.line, unit: o.unit, plan: o.plan, buildingName: o.buildingName, lang: lang, agent: ag });
         copy.disabled = false;
       } catch (e) {
         ta.value = '';
@@ -401,7 +686,7 @@
         flash(t('The post could not be made: {e}', { e: e.message }));
       }
       ta.dir = lang === 'ar' ? 'rtl' : 'ltr';
-      send.disabled = !ta.value || (canPicture(o.project, o.unit) && !file);
+      send.disabled = !ta.value || (hasPic && !file);
     }
     agentOn.addEventListener('change', function () {
       agentBox.hidden = !agentOn.checked;
@@ -438,7 +723,9 @@
       if (send.disabled) return;
       /* the demo's phone answers inside the demo (demo.html) */
       if (o.demo && typeof o.demo.sharePost === 'function') {
-        o.demo.sharePost({ text: ta.value, image: file, unit: o.unit.code, audience: o.who && o.who.audience, company: o.who && o.who.company });
+        o.demo.sharePost({ text: ta.value, image: file, unit: codes.join(', '), audience: o.who && o.who.audience, company: o.who && o.who.company,
+          /* which cards went: the manager's view will want to know what sells */
+          options: many ? o.options.map(function (x) { return { unit: x.unit.code, role: x.role }; }) : null });
         close();
         return;
       }
@@ -459,7 +746,9 @@
       }
       /* a laptop: WhatsApp Web with the text, the picture saved to attach
          (a web page cannot hand WhatsApp Web a picture) */
-      root.open('https://wa.me/?text=' + encodeURIComponent(ta.value), '_blank', 'noopener');
+      /* NOT wa.me: its redirect turns every emoji into U+FFFD (seen 2026-10-03);
+         WhatsApp's own address keeps them */
+      root.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(ta.value), '_blank', 'noopener');
       if (file) { kit.saveFile(file); flash(t('WhatsApp opened with the text. The picture is saved: attach it there.')); }
     });
 
@@ -474,15 +763,17 @@
     document.addEventListener('keydown', onKey);
 
     writeText();
-    if (canPicture(o.project, o.unit)) {
+    if (hasPic) {
       shot.appendChild(el('p', 'q-who-note', t('Making the picture…')));
-      picture({ project: o.project, unit: o.unit, buildingName: o.buildingName, lang: lang }).then(function (blob) {
-        file = new File([blob], 'Moray Wellness - ' + o.unit.code + '.jpg', { type: 'image/jpeg' });
+      (many ? pictureOptions({ project: o.project, options: o.options, lang: lang })
+            : picture({ project: o.project, unit: o.unit, buildingName: o.buildingName, lang: lang })).then(function (blob) {
+        file = new File([blob], 'Moray Wellness - ' + codes.join(' ') + '.jpg', { type: 'image/jpeg' });
         fileUrl = URL.createObjectURL(blob);
         shot.textContent = '';
         var im = el('img');
         im.src = fileUrl;
-        im.alt = t('The picture that goes with the post: the master plan with the building lit, and the clinic on its floor');
+        im.alt = many ? t('The picture that goes with the post: the master plan with the building lit, and the options numbered on their floor')
+          : t('The picture that goes with the post: the master plan with the building lit, and the clinic on its floor');
         shot.appendChild(im);
         writeText();
       }, function (e) {
@@ -492,7 +783,9 @@
         send.disabled = !ta.value;
       });
     } else {
-      shot.appendChild(el('p', 'q-who-note', t('No picture for this unit yet: its floor drawing is not traced. The text goes alone.')));
+      shot.appendChild(el('p', 'q-who-note', many
+        ? t('No picture for these units yet: they are not all traced on one floor drawing. The text goes alone.')
+        : t('No picture for this unit yet: its floor drawing is not traced. The text goes alone.')));
     }
 
     document.body.appendChild(box);
@@ -501,6 +794,7 @@
     x.focus();
   }
 
-  MM.post = { caption: caption, picture: picture, canPicture: canPicture, open: open };
+  MM.post = { caption: caption, picture: picture, canPicture: canPicture, open: open,
+              captionOptions: captionOptions, pictureOptions: pictureOptions, canPictureOptions: canPictureOptions };
   if (typeof module === 'object' && module.exports) module.exports = MM.post;
 }(typeof window !== 'undefined' ? window : globalThis));

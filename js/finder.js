@@ -146,7 +146,7 @@
 
     var S = { sizes: [], floors: [], max: null, hold: false, cash: null, quarter: null };
     var units = [], listeners = [], chips = [];
-    var pickBuilding = null, showUnit = null, showAll = false;
+    var pickBuilding = null, showUnit = null, showAll = false, sendOptions = null;
     var has = function (a, v) { return a.indexOf(v) >= 0; };
     var flip = function (a, v) { var i = a.indexOf(v); if (i >= 0) a.splice(i, 1); else a.push(v); };
 
@@ -238,16 +238,42 @@
     function score(f) {
       return Math.max(share(f.down, cap('cash')), share(f.quarter, cap('quarter')));
     }
-    function nearestMiss() {
+    function nearestMiss(minArea) {
       var best = null, bs = Infinity;
       units.forEach(function (u) {
-        if (!u.sellable || !rest(u, 'budget')) return;
+        if (!u.sellable || !rest(u, 'budget') || fitting(u).length) return;
+        if (minArea && !(u.area > minArea)) return;
         plansFor(u).forEach(function (f) {
           var s = score(f);
-          if (s < bs || (s === bs && best && u.listPrice < best.u.listPrice)) { bs = s; best = { u: u, f: f }; }
+          if (s < bs || (s === bs && best && u.listPrice < best.u.listPrice)) { bs = s; best = { u: u, f: f, s: s }; }
         });
       });
       return best;
+    }
+
+    /* ---- THE TWO SIDE CARDS (build 94, Muhanad 2026-10-03) -----------
+       The best fit stays the most the budget reaches: deal size is never
+       traded for advice. Beside it, what a senior salesperson also puts in
+       front of the broker:
+         value   — the lowest price per m² among the units that fit
+         stretch — the unit just over the budget that needs the least
+                   extra, with exactly what it needs. It must be BIGGER
+                   than the best fit: paying more for less is not an
+                   upsell anyone can sell. Not offered past
+                   STRETCH_MAX of the tighter box: that is not a stretch.
+       An upsell works when the dearer unit is in front of the broker with
+       its exact extra cost; it fails when it is hidden behind "See more". */
+    var STRETCH_MAX = 1.25;
+    function perM2(u) { return u.listPrice / u.area; }
+    function bestValue(opts) {
+      if (opts.length < 2) return null;
+      return opts.slice().sort(function (a, b) {
+        return perM2(a.u) - perM2(b.u) || b.u.area - a.u.area || a.u.code.localeCompare(b.u.code, 'en', { numeric: true });
+      })[0];
+    }
+    function stretch(top) {
+      var m = nearestMiss(top.area);
+      return m && m.s <= STRETCH_MAX ? m : null;
     }
     function countAt(cash, quarter) {
       var n = 0;
@@ -528,22 +554,48 @@
                   head: 'Also matching, from the cheapest up' },
       closest: { tag: 'Closest — over budget' }
     };
+    var SIDE = { value: 'Best value', stretch: 'Stretch' };
     function answer(on, opts) {
       if (budgetOn()) {
-        if (opts.length) return { kind: 'fit', list: opts };
+        if (opts.length) {
+          var bv = bestValue(opts);
+          return { kind: 'fit', list: opts, stretch: stretch(opts[0].u),
+                   value: bv && bv.u !== opts[0].u ? bv : null, bestIsValue: !!(bv && bv.u === opts[0].u) };
+        }
         var m = nearestMiss();
         return m ? { kind: 'closest', list: [m] } : null;
       }
       if (!on) return null;
       var ms = units.filter(function (u) { return u.sellable && match(u); }).sort(cheapFirst)
         .map(function (u) { return { u: u, f: null }; });
-      return ms.length ? { kind: 'cheapest', list: ms } : null;
+      if (!ms.length) return null;
+      /* build 95: the same two side cards on BY UNIT. The cheapest match
+         stays the answer; the price chip, when one is on, is the limit a
+         stretch goes past. No price chip, no stretch. */
+      var bu = bestValue(ms);
+      return { kind: 'cheapest', list: ms, stretch: priceStretch(ms[0].u),
+               value: bu && bu.u !== ms[0].u ? bu : null, bestIsValue: !!(bu && bu.u === ms[0].u) };
     }
-    function optCard(x, best, ans) {
+    /* the cheapest unit just above the price chip that every other filter
+       allows: bigger than the answer, and no more than STRETCH_MAX of the chip */
+    function priceStretch(top) {
+      if (!S.max) return null;
+      var best = null;
+      units.forEach(function (u) {
+        if (!u.sellable || !rest(u, 'price') || !(u.listPrice > S.max) ||
+            u.listPrice > S.max * STRETCH_MAX || !(u.area > top.area)) return;
+        if (!best || cheapFirst(u, best.u) < 0) best = { u: u, f: null };
+      });
+      return best;
+    }
+    /* side: 'value' | 'stretch' for the two side cards, else undefined */
+    function optCard(x, best, ans, side) {
       var u = x.u, f = x.f, k = ans.kind;
-      var b = el('button', 'fd-opt' + (best ? ' is-best' : '') + (k === 'closest' ? ' is-over' : ''));
+      var over = k === 'closest' || side === 'stretch';
+      var tag = best ? t(KIND[k].tag) : side ? t(SIDE[side]) : '';
+      var b = el('button', 'fd-opt' + (best ? ' is-best' : '') + (side ? ' is-side' : '') + (over ? ' is-over' : ''));
       b.type = 'button';
-      if (best) b.appendChild(el('span', 'fd-otag', t(KIND[k].tag)));
+      if (tag) b.appendChild(el('span', 'fd-otag' + (side ? ' is-side' : ''), tag));
       var top = el('span', 'fd-o1');
       top.appendChild(el('b', null, u.code));
       top.appendChild(document.createTextNode(' · ' + t('{a} m²', { a: money(u.area) }) + ' · ' + nameOf(u.building) + ' · ' + flFull(u.fid)));
@@ -553,20 +605,35 @@
         b.appendChild(el('span', 'fd-o2', plan(f.label)));
         b.appendChild(el('span', 'fd-o3', f.cash ? t('EGP {v} cash, once', { v: money(f.down) })
           : t('{down} down · {each} a quarter', { down: money(f.down), each: money(f.each) })));
-        if (k === 'closest') {
+        if (over) {
           var gaps = [];
           if (f.down > cap('cash')) gaps.push(t('EGP {v} more cash', { v: money(f.down - cap('cash')) }));
           if (f.quarter > cap('quarter')) gaps.push(t('EGP {v} more a quarter', { v: money(f.quarter - cap('quarter')) }));
           if (gaps.length) b.appendChild(el('span', 'fd-o4', t('Needs {list}', { list: gaps.join(t(' and ')) })));
         } else b.appendChild(el('span', 'fd-o4', spare(f)));
+        /* why this card, in one line, from the sheet's own figures */
+        var top1 = ans.list[0].u;
+        if (side === 'value') b.appendChild(el('span', 'fd-o4', t('EGP {v} per m², the lowest of the {n} that fit',
+          { v: money(perM2(u)), n: ans.list.length })));
+        if (best && ans.bestIsValue) b.appendChild(el('span', 'fd-o4', t('Also the lowest price per m² that fits')));
+        if (side === 'stretch' && u.area > top1.area) b.appendChild(el('span', 'fd-o4',
+          t('{n} m² more than the best fit', { n: money(u.area - top1.area) })));
       } else {
         b.appendChild(el('span', 'fd-o2', t('{v} EGP per m²', { v: money(u.listPrice / u.area) })));
         /* a tie is part of the answer: the broker is offered all of them */
         var same = best ? ans.list.slice(1).filter(function (y) { return y.u.listPrice === u.listPrice; }) : [];
         if (same.length) b.appendChild(el('span', 'fd-o3', t('Same price: {codes}', { codes: same.map(function (y) { return y.u.code; }).join(', ') })));
+        /* why this card (build 95), as on the budget tab */
+        var first = ans.list[0].u;
+        if (side === 'value') b.appendChild(el('span', 'fd-o4', t('The lowest price per m² of the {n} that match', { n: ans.list.length })));
+        if (best && ans.bestIsValue) b.appendChild(el('span', 'fd-o4', t('Also the lowest price per m² that matches')));
+        if (side === 'stretch') {
+          b.appendChild(el('span', 'fd-o4', t('EGP {v} above the {max} limit', { v: money(u.listPrice - S.max), max: millions(S.max) })));
+          b.appendChild(el('span', 'fd-o4', t('{n} m² more than the cheapest match', { n: money(u.area - first.area) })));
+        }
       }
       if (best) b.appendChild(el('span', 'fd-ogo', t('Show it on the layout')));
-      b.setAttribute('aria-label', (best ? t(KIND[k].tag) + ': ' : '') + u.code + ', ' + money(u.listPrice) +
+      b.setAttribute('aria-label', (tag ? tag + ': ' : '') + u.code + ', ' + money(u.listPrice) +
         (f ? ', ' + plan(f.label) : '') + '. ' + t('Show it on the layout'));
       b.addEventListener('click', function () { if (showUnit) showUnit(u, f ? f.id : null); });
       return b;
@@ -577,6 +644,22 @@
       var opts = ans.list, K = KIND[ans.kind];
       var wrap = el('div', 'fd-opts');
       wrap.appendChild(optCard(opts[0], true, ans));
+      if (ans.value) wrap.appendChild(optCard(ans.value, false, ans, 'value'));
+      if (ans.stretch) wrap.appendChild(optCard(ans.stretch, false, ans, 'stretch'));
+      /* build 96, SEND THESE OPTIONS: the cards above leave the app as ONE
+         WhatsApp post (js/post.js), so the advice reaches the broker and the
+         dearer unit is in front of the client. The page does the sending. */
+      var cards = [{ x: opts[0], role: ans.kind === 'fit' ? 'fit' : 'cheapest' }];
+      if (ans.value) cards.push({ x: ans.value, role: 'value' });
+      if (ans.stretch) cards.push({ x: ans.stretch, role: 'stretch' });
+      if (cards.length > 1 && ans.kind !== 'closest') {
+        var sendB = el('button', 'fd-send', t('Send these {n} options on WhatsApp', { n: cards.length }));
+        sendB.type = 'button';
+        sendB.addEventListener('click', function () {
+          if (sendOptions) sendOptions(cards.map(function (c) { return { u: c.x.u, plan: c.x.f ? c.x.f.id : null, role: c.role }; }));
+        });
+        wrap.appendChild(sendB);
+      }
       var others = opts.length - 1;
       if (others && K.more) {
         var more = el('button', 'fd-seemore', optsAll ? t('Hide the other options')
@@ -740,6 +823,7 @@
       onChange: function (fn) { listeners.push(fn); },
       onPickBuilding: function (fn) { pickBuilding = fn; },
       onShowUnit: function (fn) { showUnit = fn; },
+      onSendOptions: function (fn) { sendOptions = fn; },
       open: setOpen,
       /* for the checks only: the state, read-only */
       state: function () { return JSON.parse(JSON.stringify(S)); }

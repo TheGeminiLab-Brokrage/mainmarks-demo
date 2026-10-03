@@ -3102,6 +3102,16 @@ body.is-ready .mv-hint { opacity: 1; }
 .fd-opt.is-best { background: rgba(52, 211, 153, .12); border: 1.5px solid var(--q-best); box-shadow: 0 0 0 4px rgba(52, 211, 153, .12); }
 .fd-otag { grid-column: 1 / -1; justify-self: start; margin-bottom: 4px; padding: 2px 9px; border-radius: 10px;
   font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #04130d; background: var(--q-best); }
+/* the two side cards beside the best fit (build 94): Best value, Stretch.
+   Plain cards with an outlined tag: green stays the best fit's alone. */
+.fd-otag.is-side { color: var(--white); background: transparent; border: 1px solid var(--q-edge-hi); }
+.fd-opt.is-side.is-over { border-style: dashed; }
+/* build 96: "Send these options". It LOOKS like the app's send button (.q-cta) but is not one:
+   the demo playback and the checks find the offer's own button by that class. */
+.fd-send { display: block; box-sizing: border-box; width: 100%; max-width: 520px; margin-top: 10px;
+  font: inherit; font-size: 15px; font-weight: 700; color: #000; cursor: pointer;
+  background: var(--orange); border: 0; border-radius: 12px; padding: 13px 20px; min-height: 48px; }
+.fd-send:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
 .fd-ogo { grid-column: 1 / -1; margin-top: 6px; font-size: 12.5px; font-weight: 700; color: var(--q-best); }
 .fd-ogo::after { content: " →"; }
 .fd-seemore { font: inherit; font-size: 13px; font-weight: 600; color: var(--white); cursor: pointer; margin-top: 8px;
