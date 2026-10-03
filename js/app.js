@@ -46,7 +46,7 @@
   var whoBox = document.getElementById('who');
   if (whoBox) {
     MM.whoMenu(whoBox, session, {
-      role: (CONFIG.roles[session.role] || {}).label || session.role,
+      role: t((CONFIG.roles[session.role] || {}).label || session.role),
       onOut: function () { MM.auth.signOut(); MM.leave('login.html', { replace: true }); }
     });
   }
@@ -140,8 +140,8 @@
     } else {
       b.appendChild(el('span', 'c-band-name', p.full || p.name));
     }
-    if (p.promise) b.appendChild(el('span', 'c-tagline', p.promise));
-    else if (p.mark) b.appendChild(el('span', 'c-tagline', p.mark));
+    if (p.promise) b.appendChild(el('span', 'c-tagline', t(p.promise)));
+    else if (p.mark) b.appendChild(el('span', 'c-tagline', t(p.mark)));
     return b;
   }
 
@@ -164,7 +164,7 @@
       var sq = el('span', 'c-pillar-mark');
       sq.style.background = (p.colour && p.colour[pl.id]) || 'var(--white)';
       item.appendChild(sq);
-      item.appendChild(el('span', null, pl.name));
+      item.appendChild(el('span', null, t(pl.name)));
       row.appendChild(item);
     });
     return row;
@@ -180,7 +180,7 @@
        about. */
     dot.style.background = 'var(--orange)';
     line.appendChild(dot);
-    line.appendChild(el('span', null, p.place || ''));
+    line.appendChild(el('span', null, t(p.place || '')));
     return line;
   }
 
@@ -191,10 +191,10 @@
     var dl = el('dl', 'c-facts');
     (p.facts || []).forEach(function (f) {
       var wrap = el('div');
-      wrap.appendChild(el('dt', null, f.k));
+      wrap.appendChild(el('dt', null, t(f.k)));
       /* the short form where there is one: the card drops the feddan
          conversion and the percentage, the project page keeps them */
-      wrap.appendChild(el('dd', null, f.s || f.v));
+      wrap.appendChild(el('dd', null, t(f.s || f.v)));
       dl.appendChild(wrap);
     });
     return dl;
@@ -206,9 +206,9 @@
   function featureCard(p) {
     var a = el('a', 'mm-card feature');
     a.href = 'project.html?p=' + encodeURIComponent(p.id);
-    a.setAttribute('aria-label', t('Open ') + (p.full || p.name));
+    a.setAttribute('aria-label', t('Open {name}', { name: p.full || p.name }));
 
-    a.appendChild(shot(p, p.kind));
+    a.appendChild(shot(p, t(p.kind)));
 
     var side = el('div', 'c-side');
     side.appendChild(band(p, 30));
@@ -216,11 +216,11 @@
 
     var meta = el('div', 'c-meta');
     if (p.place) meta.appendChild(placeLine(p));
-    if (p.blurb) meta.appendChild(el('p', 'c-blurb', p.blurb));
+    if (p.blurb) meta.appendChild(el('p', 'c-blurb', t(p.blurb)));
     if (p.facts && p.facts.length) meta.appendChild(factList(p));
 
     var go = el('div', 'c-go');
-    go.appendChild(el('span', null, t('Open ') + (p.short || p.name)));
+    go.appendChild(el('span', null, t('Open {name}', { name: p.short || p.name })));
     go.appendChild(arrow());
     meta.appendChild(go);
 
@@ -278,7 +278,7 @@
 
     var meta = el('div', 'c-meta');
     if (p.place) meta.appendChild(placeLine(p));
-    if (p.blurb) meta.appendChild(el('p', 'c-blurb', p.blurb));
+    if (p.blurb) meta.appendChild(el('p', 'c-blurb', t(p.blurb)));
     meta.appendChild(el('div', 'c-go c-go-soon', t(
       held ? 'Not released yet' : 'Not open for your account'
     )));

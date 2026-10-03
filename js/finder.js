@@ -57,13 +57,20 @@
   var LADDER = [10, 12, 15, 20, 25, 30, 50, 75, 100].map(function (m) { return m * 1e6; });
 
   var ORDER = ['street', 'ground', 'first', 'second', 'third', 'fourth', 'fifth'];
+  /* "add this much and N more units come into reach", one whole sentence each */
+  var LEVER = [
+    'Add EGP {gap} a quarter and one more unit comes into reach.', 'Add EGP {gap} a quarter and {n} more units come into reach.',
+    'Add EGP {gap} cash and one more unit comes into reach.', 'Add EGP {gap} cash and {n} more units come into reach.',
+    'Or add EGP {gap} a quarter and one more unit comes into reach.', 'Or add EGP {gap} a quarter and {n} more units come into reach.',
+    'Or add EGP {gap} cash and one more unit comes into reach.', 'Or add EGP {gap} cash and {n} more units come into reach.'
+  ];
   var FLOOR = { street: 'Street', ground: 'Ground', first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th' };
 
   function money(v) { return Math.round(v).toLocaleString('en-US'); }
   function millions(v) { return (Math.round(v / 1e4) / 100).toString().replace(/\.0+$/, '') + 'M'; }
   /* 55,500 reads "55.5k", never "56k": a summary must not round a budget
      up past what the client said */
-  function short(v) { return v >= 1e6 ? millions(v) : (Math.round(v / 100) / 10).toString().replace(/\.0$/, '') + 'k'; }
+  function short(v) { return !v ? '0' : v >= 1e6 ? millions(v) : (Math.round(v / 100) / 10).toString().replace(/\.0$/, '') + 'k'; }
   function roundUpTo(n, step) { return Math.ceil(n / step) * step; }
 
   /* What a salesperson types: "8m", "500k", "8,000,000", "٨٠٠٠٠٠٠",
@@ -75,7 +82,8 @@
     var mil = /(m|mn|million|مليون)\s*$/i.test(s);
     var thou = /(k|thousand|الف|ألف)\s*$/i.test(s);
     var v = MM.inventory.num(s);
-    if (v === null || !(v > 0)) return null;
+    /* "0" is an answer — the client has no cash — not an empty box */
+    if (v === null || !(v >= 0)) return null;
     if (mil) v *= 1e6; else if (thou) v *= 1e3;
     return Math.round(v);
   }
@@ -85,7 +93,12 @@
     var el = MM.el, t = MM.t;
     var p = o.project;
     var every = (p.terms && p.terms.instalmentEvery) || 3;
-    var nameOf = o.nameOf || function (k) { return t('Building ') + k; };
+    var nameOf = o.nameOf || function (k) { return t('Building {b}', { b: k }); };
+    /* build 92: the sheet's floor words in the app's language */
+    var fl = function (f) { return MM.tx ? MM.tx.floorShort(f, FLOOR[f] || f) : (FLOOR[f] || f); };
+    var flFull = function (f) { return MM.tx ? MM.tx.floor(f, (FLOOR[f] || f) + ' floor') : (FLOOR[f] || f) + ' floor'; };
+    var plan = function (label) { return MM.tx ? MM.tx.plan(label) : label; };
+    var join = function (a) { return MM.tx ? MM.tx.list(a) : a.join(', '); };
 
     var box = el('div', 'fd');
     box.setAttribute('role', 'search');
@@ -154,11 +167,18 @@
       }).filter(Boolean);
       return fitCache[u.code];
     }
+    /* NEVER ASSUME MONEY THE CLIENT DID NOT SAY HE HAS (2026-10-03). Once a
+       budget is typed, a box left empty counts as ZERO, never "no limit":
+       only "400k a quarter" typed used to answer "spot cash 12.2M", and
+       only cash typed answered a plan at 1.07M a quarter. Now only a
+       quarter typed reaches plans with no down payment, and only cash
+       typed reaches cash plans; everything shown is surely affordable. */
+    function cap(key) { return S[key] === null ? 0 : S[key]; }
     function fitsAt(f, cash, quarter) {
-      return (!cash || f.down <= cash) && (!quarter || f.quarter <= quarter);
+      return f.down <= (cash || 0) && f.quarter <= (quarter || 0);
     }
     function fitting(u) { return plansFor(u).filter(function (f) { return fitsAt(f, S.cash, S.quarter); }); }
-    var budgetOn = function () { return !!(S.cash || S.quarter); };
+    var budgetOn = function () { return S.cash !== null || S.quarter !== null; };
 
     /* THE PLAN TO OFFER a unit on, when more than one fits the budget: the
        one that costs the client least in total (usually the biggest
@@ -214,8 +234,9 @@
 
     /* ---- when nothing fits: the nearest miss, on the share of the budget
        it would need on whichever lever is tighter; ties to the lower price */
+    function share(need, have) { return need <= 0 ? 0 : (have > 0 ? need / have : Infinity); }
     function score(f) {
-      return Math.max(S.cash ? f.down / S.cash : 0, S.quarter ? f.quarter / S.quarter : 0);
+      return Math.max(share(f.down, cap('cash')), share(f.quarter, cap('quarter')));
     }
     function nearestMiss() {
       var best = null, bs = Infinity;
@@ -241,26 +262,24 @@
        The smaller proportional rise is listed first. */
     function levers(have) {
       if (!budgetOn()) return [];
-      var needQ = null, needC = null;
+      var needQ = null, needC = null, hc = cap('cash'), hq = cap('quarter');
       units.forEach(function (u) {
         if (!u.sellable || !rest(u, 'budget')) return;
         var fs = plansFor(u);
         if (fs.some(function (f) { return fitsAt(f, S.cash, S.quarter); })) return;
         fs.forEach(function (f) {
-          if (S.quarter && (!S.cash || f.down <= S.cash) && f.quarter > S.quarter &&
-              (needQ === null || f.quarter < needQ)) needQ = f.quarter;
-          if (S.cash && (!S.quarter || f.quarter <= S.quarter) && f.down > S.cash &&
-              (needC === null || f.down < needC)) needC = f.down;
+          if (f.down <= hc && f.quarter > hq && (needQ === null || f.quarter < needQ)) needQ = f.quarter;
+          if (f.quarter <= hq && f.down > hc && (needC === null || f.down < needC)) needC = f.down;
         });
       });
       var out = [];
       if (needQ !== null) {
         var q = roundUpTo(needQ, 5000), n1 = countAt(S.cash, q) - have;
-        if (n1 > 0) out.push({ key: 'quarter', value: q, gap: q - S.quarter, n: n1, rise: (q - S.quarter) / S.quarter });
+        if (n1 > 0) out.push({ key: 'quarter', value: q, gap: q - hq, n: n1, rise: share(q - hq, hq) });
       }
       if (needC !== null) {
         var c = roundUpTo(needC, 10000), n2 = countAt(c, S.quarter) - have;
-        if (n2 > 0) out.push({ key: 'cash', value: c, gap: c - S.cash, n: n2, rise: (c - S.cash) / S.cash });
+        if (n2 > 0) out.push({ key: 'cash', value: c, gap: c - hc, n: n2, rise: share(c - hc, hc) });
       }
       out.sort(function (a, b) { return a.rise - b.rise; });
       return out;
@@ -344,7 +363,7 @@
       menu.appendChild(list);
       list.appendChild(chip(t('Any floor'), function () { return !S.floors.length; }, function () { S.floors = []; }));
       floorList.forEach(function (f) {
-        list.appendChild(chip(FLOOR[f] || f, function () { return has(S.floors, f); }, function () { flip(S.floors, f); }));
+        list.appendChild(chip(fl(f), function () { return has(S.floors, f); }, function () { flip(S.floors, f); }));
       });
       var done = el('button', 'fd-more', t('Done'));
       done.type = 'button';
@@ -359,7 +378,7 @@
       btn.__sync = function () {
         btn.setAttribute('aria-pressed', String(S.floors.length > 0));
         label.textContent = !S.floors.length ? t('Floors')
-          : t('Floors: ') + floorList.filter(function (f) { return has(S.floors, f); }).map(function (f) { return FLOOR[f] || f; }).join(', ');
+          : t('Floors: {list}', { list: join(floorList.filter(function (f) { return has(S.floors, f); }).map(fl)) });
       };
       btn.__sync();
       chips.push(btn);
@@ -420,7 +439,7 @@
       areas.sort(function (a, b) { return a - b; });
       var narrowed = S.floors.length || S.max || budgetOn();
       var offer = (narrowed && areas.length && areas.length <= EXACT_UP_TO)
-        ? areas.map(function (a) { return { k: 'a' + a, label: money(a) + ' m²' }; })
+        ? areas.map(function (a) { return { k: 'a' + a, label: t('{a} m²', { a: money(a) }) }; })
         : SIZE_BANDS.filter(function (b) { return areas.some(function (a) { return a > b.lo && a <= b.hi; }); })
             .map(function (b) { return { k: b.id, label: t(b.label) }; });
       var keys = offer.map(function (x) { return x.k; });
@@ -457,10 +476,10 @@
       if (!offer.length) priceRow.wrap.appendChild(el('span', 'fd-none', t('One price band left')));
     }
     function floorWords() {
-      return floorList.filter(function (f) { return has(S.floors, f); }).map(function (f) { return FLOOR[f] || f; }).join(', ') + t(' floor');
+      return t('{floors} floor', { floors: join(floorList.filter(function (f) { return has(S.floors, f); }).map(fl)) });
     }
     function sizeWord(k) {
-      if (k.charAt(0) === 'a') return money(+k.slice(1)) + ' m²';
+      if (k.charAt(0) === 'a') return t('{a} m²', { a: money(+k.slice(1)) });
       var b = SIZE_BANDS.filter(function (x) { return x.id === k; })[0];
       return b ? t(b.label) : k;
     }
@@ -468,13 +487,13 @@
       var bits = [o.useWord || ''];
       if (S.sizes.length) bits.push(S.sizes.map(sizeWord).join(t(' or ')));
       if (S.floors.length) bits.push(floorWords());
-      if (S.max) bits.push(t('up to ') + millions(S.max));
-      if (S.cash) bits.push(t('cash ') + short(S.cash));
-      if (S.quarter) bits.push(short(S.quarter) + t(' a quarter'));
+      if (S.max) bits.push(t('up to {v}', { v: millions(S.max) }));
+      if (S.cash !== null) bits.push(t('cash {v}', { v: short(S.cash) }));
+      if (S.quarter !== null) bits.push(t('{v} a quarter', { v: short(S.quarter) }));
       if (S.hold) bits.push(t('+ on hold'));
       return bits.filter(Boolean).join(' · ');
     }
-    function where(u) { return nameOf(u.building) + ' · ' + (FLOOR[u.fid] || u.fid) + t(' floor') + ' · ' + u.code; }
+    function where(u) { return nameOf(u.building) + ' · ' + flFull(u.fid) + ' · ' + u.code; }
 
     function fillPick(btn, k, u, lines) {
       btn.textContent = '';
@@ -490,9 +509,9 @@
     var optsAll = false;
     function spare(f) {
       var bits = [];
-      if (S.cash && S.cash - f.down >= 1000) bits.push(short(S.cash - f.down) + t(' cash'));
-      if (S.quarter && !f.cash && S.quarter - f.quarter >= 1000) bits.push(short(S.quarter - f.quarter) + t(' a quarter'));
-      return bits.length ? bits.join(t(' and ')) + t(' to spare') : t('uses the whole budget');
+      if (S.cash && S.cash - f.down >= 1000) bits.push(t('{v} cash', { v: short(S.cash - f.down) }));
+      if (S.quarter && !f.cash && S.quarter - f.quarter >= 1000) bits.push(t('{v} a quarter', { v: short(S.quarter - f.quarter) }));
+      return bits.length ? t('{list} to spare', { list: bits.join(t(' and ')) }) : t('uses the whole budget');
     }
     /* THE ANSWER (build 76). Whatever Find a unit is asked, it answers with
        ONE unit, in both tabs, and that unit wears green everywhere: this
@@ -503,9 +522,9 @@
        The other units that also answer wait behind "See N more" here, and
        behind "Show other options" on the drawing. */
     var KIND = {
-      fit: { tag: 'Best fit', more1: ' more unit that fits', more: ' more units that fit',
+      fit: { tag: 'Best fit', more1: 'See {n} more unit that fits', more: 'See {n} more units that fit',
              head: 'Also within the budget, from the dearest down' },
-      cheapest: { tag: 'Cheapest match', more1: ' more match', more: ' more matches',
+      cheapest: { tag: 'Cheapest match', more1: 'See {n} more match', more: 'See {n} more matches',
                   head: 'Also matching, from the cheapest up' },
       closest: { tag: 'Closest — over budget' }
     };
@@ -527,28 +546,28 @@
       if (best) b.appendChild(el('span', 'fd-otag', t(KIND[k].tag)));
       var top = el('span', 'fd-o1');
       top.appendChild(el('b', null, u.code));
-      top.appendChild(document.createTextNode(' · ' + money(u.area) + ' m² · ' + nameOf(u.building) + ' · ' + (FLOOR[u.fid] || u.fid) + t(' floor')));
+      top.appendChild(document.createTextNode(' · ' + t('{a} m²', { a: money(u.area) }) + ' · ' + nameOf(u.building) + ' · ' + flFull(u.fid)));
       b.appendChild(top);
       b.appendChild(el('span', 'fd-op', money(u.listPrice)));
       if (f) {
-        b.appendChild(el('span', 'fd-o2', t(f.label)));
-        b.appendChild(el('span', 'fd-o3', f.cash ? t('EGP ') + money(f.down) + t(' cash, once')
-          : money(f.down) + t(' down · ') + money(f.each) + t(' a quarter')));
+        b.appendChild(el('span', 'fd-o2', plan(f.label)));
+        b.appendChild(el('span', 'fd-o3', f.cash ? t('EGP {v} cash, once', { v: money(f.down) })
+          : t('{down} down · {each} a quarter', { down: money(f.down), each: money(f.each) })));
         if (k === 'closest') {
           var gaps = [];
-          if (S.cash && f.down > S.cash) gaps.push(t('EGP ') + money(f.down - S.cash) + t(' more cash'));
-          if (S.quarter && f.quarter > S.quarter) gaps.push(t('EGP ') + money(f.quarter - S.quarter) + t(' more a quarter'));
-          if (gaps.length) b.appendChild(el('span', 'fd-o4', t('Needs ') + gaps.join(t(' and '))));
+          if (f.down > cap('cash')) gaps.push(t('EGP {v} more cash', { v: money(f.down - cap('cash')) }));
+          if (f.quarter > cap('quarter')) gaps.push(t('EGP {v} more a quarter', { v: money(f.quarter - cap('quarter')) }));
+          if (gaps.length) b.appendChild(el('span', 'fd-o4', t('Needs {list}', { list: gaps.join(t(' and ')) })));
         } else b.appendChild(el('span', 'fd-o4', spare(f)));
       } else {
-        b.appendChild(el('span', 'fd-o2', money(u.listPrice / u.area) + t(' EGP per m²')));
+        b.appendChild(el('span', 'fd-o2', t('{v} EGP per m²', { v: money(u.listPrice / u.area) })));
         /* a tie is part of the answer: the broker is offered all of them */
         var same = best ? ans.list.slice(1).filter(function (y) { return y.u.listPrice === u.listPrice; }) : [];
-        if (same.length) b.appendChild(el('span', 'fd-o3', t('Same price: ') + same.map(function (y) { return y.u.code; }).join(', ')));
+        if (same.length) b.appendChild(el('span', 'fd-o3', t('Same price: {codes}', { codes: same.map(function (y) { return y.u.code; }).join(', ') })));
       }
       if (best) b.appendChild(el('span', 'fd-ogo', t('Show it on the layout')));
       b.setAttribute('aria-label', (best ? t(KIND[k].tag) + ': ' : '') + u.code + ', ' + money(u.listPrice) +
-        (f ? ', ' + t(f.label) : '') + '. ' + t('Show it on the layout'));
+        (f ? ', ' + plan(f.label) : '') + '. ' + t('Show it on the layout'));
       b.addEventListener('click', function () { if (showUnit) showUnit(u, f ? f.id : null); });
       return b;
     }
@@ -561,7 +580,7 @@
       var others = opts.length - 1;
       if (others && K.more) {
         var more = el('button', 'fd-seemore', optsAll ? t('Hide the other options')
-          : t('See ') + others + (others === 1 ? t(K.more1) : t(K.more)));
+          : t(others === 1 ? K.more1 : K.more, { n: others }));
         more.type = 'button';
         more.setAttribute('aria-expanded', String(optsAll));
         more.addEventListener('click', function () { optsAll = !optsAll; optsFull = false; changed(null, true); });
@@ -572,7 +591,7 @@
           var rest1 = opts.slice(1);
           (optsFull ? rest1 : rest1.slice(0, OPT_CAP)).forEach(function (x) { list.appendChild(optCard(x, false, ans)); });
           if (rest1.length > OPT_CAP && !optsFull) {
-            var all = el('button', 'fd-more', t('Show all ') + rest1.length);
+            var all = el('button', 'fd-more', t('Show all {n}', { n: rest1.length }));
             all.type = 'button';
             all.addEventListener('click', function () { optsFull = true; changed(null, true); });
             list.appendChild(all);
@@ -589,12 +608,17 @@
       renderPrices();
       chips.forEach(function (c) { c.__sync(); });
       boxes.forEach(function (b) {
-        if (b.key !== typingKey) b.input.value = S[b.key] ? money(S[b.key]) : '';
+        if (b.key !== typingKey) b.input.value = S[b.key] !== null ? money(S[b.key]) : '';
+        /* once a budget is on, a box at zero (typed or left empty) says
+           what that rules out, so the answer never looks arbitrary */
         b.read.textContent = S[b.key]
           ? (b.key === 'quarter'
-              ? t('Up to EGP ') + money(S[b.key]) + t(' every 3 months (about ') + money(S[b.key] / every) + t(' a month)')
-              : t('Up to EGP ') + money(S[b.key]))
-          : (b.input.value && b.key === typingKey ? t('Type an amount') : '');
+              ? t('Up to EGP {v} every 3 months (about {m} a month)', { v: money(S[b.key]), m: money(S[b.key] / every) })
+              : t('Up to EGP {v}', { v: money(S[b.key]) }))
+          : (b.input.value && S[b.key] === null && b.key === typingKey) ? t('Type an amount')
+          : budgetOn() ? (b.key === 'cash' ? t('No cash: plans with no down payment only')
+                                           : t('No instalments: cash plans only'))
+          : '';
       });
 
       var on = active();
@@ -614,7 +638,7 @@
       cheapest.hidden = !cheapestU;
       cheapest.classList.toggle('is-pinned', !!(cheapestU && pinned === cheapestU.code));
       if (cheapestU) fillPick(cheapest, t('Cheapest available'), cheapestU,
-        [where(cheapestU) + ' · ' + money(cheapestU.area) + ' m²' + t(' — show it on the layout')]);
+        [where(cheapestU) + ' · ' + t('{a} m²', { a: money(cheapestU.area) }) + t(' — show it on the layout')]);
 
       var opts = options();
       var ans = answer(on, opts);
@@ -623,7 +647,7 @@
       summary.hidden = !on;
       if (on) {
         summary.appendChild(el('span', 'fd-what', describe()));
-        summary.appendChild(el('span', 'fd-found' + (total ? '' : ' is-none'), total ? total + t(' match') : t('nothing matches')));
+        summary.appendChild(el('span', 'fd-found' + (total ? '' : ' is-none'), total ? t(total === 1 ? '{n} match' : '{n} matches', { n: total }) : t('nothing matches')));
       }
 
       result.textContent = '';
@@ -633,10 +657,12 @@
         if (!total) {
           result.appendChild(el('p', 'fd-count is-none', ans && ans.kind === 'closest'
             ? t('Nothing fits that budget. The closest unit is above.')
+            : (budgetOn() && !cap('quarter')) ? t('Nothing fits on cash alone. Type what the client can pay per quarter.')
             : (S.hold ? t('Nothing matches. Take a filter off.') : t('Nothing matches. Take a filter off, or include on hold.'))));
         } else {
-          result.appendChild(el('p', 'fd-count', total + (total === 1 ? t(' unit in ') : t(' units in ')) + list.length +
-            (list.length === 1 ? t(' building — lit on the view. Tap one:') : t(' buildings — lit on the view. Tap one:'))));
+          result.appendChild(el('p', 'fd-count', t('{units} in {buildings} — lit on the view. Tap one:', {
+            units: t(total === 1 ? '1 unit' : '{n} units', { n: total }),
+            buildings: t(list.length === 1 ? '1 building' : '{n} buildings', { n: list.length }) })));
           var bl = el('div', 'fd-buildings');
           var CAP = 8;                        /* forty chips push the picture off a phone */
           (showAll ? list : list.slice(0, CAP)).forEach(function (k) {
@@ -644,12 +670,12 @@
             b.type = 'button';
             b.appendChild(el('span', null, nameOf(k)));
             b.appendChild(el('span', 'fd-bc', String(byB[k])));
-            b.setAttribute('aria-label', nameOf(k) + ', ' + byB[k] + t(' matching units'));
+            b.setAttribute('aria-label', t('{name}, {n} matching units', { name: nameOf(k), n: byB[k] }));
             b.addEventListener('click', function () { if (pickBuilding) pickBuilding(k); });
             bl.appendChild(b);
           });
           if (list.length > CAP) {
-            var more = el('button', 'fd-more', showAll ? t('Show fewer') : t('Show all ') + list.length);
+            var more = el('button', 'fd-more', showAll ? t('Show fewer') : t('Show all {n}', { n: list.length }));
             more.type = 'button';
             more.addEventListener('click', function () { showAll = !showAll; changed(); });
             bl.appendChild(more);
@@ -662,9 +688,10 @@
           var ub = el('div', 'fd-unlock');
           lv.forEach(function (x, i) {
             var pp = el('p');
-            pp.appendChild(document.createTextNode((i ? t('Or add EGP ') : t('Add EGP ')) + money(x.gap) +
-              (x.key === 'quarter' ? t(' a quarter') : t(' cash')) +
-              (x.n === 1 ? t(' and one more unit comes into reach. ') : t(' and ') + x.n + t(' more units come into reach. '))));
+            /* one whole sentence per case (also in scripts/i18n-dynamic.json) */
+            var lk = (i ? 4 : 0) + (x.key === 'quarter' ? 0 : 2) + (x.n === 1 ? 0 : 1);
+            pp.appendChild(document.createTextNode(t(LEVER[lk],
+              { gap: money(x.gap), n: x.n }) + ' '));
             var ap = el('button', 'fd-apply', t('Apply'));
             ap.type = 'button';
             ap.addEventListener('click', function () { S[x.key] = x.value; showAll = false; changed(); });

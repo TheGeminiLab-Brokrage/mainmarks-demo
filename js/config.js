@@ -14,7 +14,7 @@ const CONFIG = {
   /* Bumped on every deploy, and matched by the ?v= on every script tag in
      the HTML. That pair is what stops a returning phone running yesterday's
      JavaScript. See README, "Deploying". */
-  build: 91,
+  build: 93,
 
   /* Where the activity log is sent. Empty = kept on the device only, which
      is where it is today. Filling this in is the whole change when the
@@ -55,9 +55,9 @@ const CONFIG = {
      TRIAL font, so it is not used here until they confirm a licence.
      Arabic, when it comes, is Noto Kufi Arabic (CI PDF p.31, Google Fonts). */
   type: {
-    corporate: "'Manrope', system-ui, sans-serif",
-    project:   "'Manrope', system-ui, sans-serif",
-    utility:   "'Manrope', system-ui, sans-serif",   /* was Hanken Grotesk — not in the CI */
+    corporate: "'Manrope', 'IBM Plex Sans Arabic', system-ui, sans-serif",
+    project:   "'Manrope', 'IBM Plex Sans Arabic', system-ui, sans-serif",
+    utility:   "'Manrope', 'IBM Plex Sans Arabic', system-ui, sans-serif",   /* was Hanken Grotesk — not in the CI */
     substitute: true,
     real:      'Gold Lines Serif'
   },

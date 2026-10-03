@@ -63,7 +63,7 @@
       var row = el('button', 'demo-acct');
       row.type = 'button';
       row.appendChild(el('span', 'da-n', u.email || u.name));
-      row.appendChild(el('span', 'da-r', (CONFIG.roles[u.role] || {}).label || u.role));
+      row.appendChild(el('span', 'da-r', t((CONFIG.roles[u.role] || {}).label || u.role)));
       row.addEventListener('click', function () {
         who.value = u.email || u.name;
         code.value = u.code;

@@ -14,7 +14,9 @@
      caption  the offer headline · ✨ Moray Wellness ✨ · 📍E125 · size ·
               floor and building · price before (struck) and after the
               discount · down payment · quarterly instalment · about how
-              much a month · how long the offer runs. Arabic or English.
+              much a month · how long the offer runs. In the language the
+              app is in (build 92, Muhanad: "English or Arabic depends on
+              the language used in the app"), the picture's words too.
 
    WHY A POST AND NOT ONLY THE PDF (playbook 01, 5b): in a broker group a
    PDF reads as a formal offer nobody opens; a picture with a formatted
@@ -200,19 +202,29 @@
   /* The Moray Wellness CI, as the PDF uses it (js/pdf.js) */
   var TEAL = '#095569', ORANGE = '#FA6126', CHAR = '#191819', GREY = '#5B6670', RULE = '#DCE3E6';
 
-  /* o: { project, unit, buildingName } -> Promise<Blob> */
+  var PIC = {
+    en: { building: function (b) { return 'BUILDING ' + b; }, use: function (u) { return (USE_EN[u.type] || u.type).toUpperCase(); },
+          area: function (u) { return money(u.area) + ' m²'; }, where: function (u, b) { return (FLOOR_EN[u.fid] || u.floor) + ' · Building ' + b; },
+          sample: 'SAMPLE · terms to be confirmed' },
+    ar: { building: function (b) { return 'مبنى ' + b; }, use: function (u) { return USE_AR[u.type] || u.type; },
+          area: function (u) { return money(u.area) + ' متر'; }   /* the posts' word; a canvas puts ² on the wrong side in Arabic */, where: function (u, b) { return (FLOOR_AR[u.fid] || u.floor) + ' · مبنى ' + b; },
+          sample: 'عينة · الشروط قيد التأكيد' }
+  };
+
+  /* o: { project, unit, buildingName, lang } -> Promise<Blob> */
   function picture(o) {
-    var p = o.project, u = o.unit;
+    var p = o.project, u = o.unit, W8 = PIC[o.lang === 'ar' ? 'ar' : 'en'], AR_PIC = o.lang === 'ar';
     if (!canPicture(p, u)) return Promise.reject(new Error('Unit ' + u.code + ' has no drawing yet'));
     var a = p.offer.art, box = p.plates[u.building][u.fid], shape = p.unitShapes[u.code], R = p.offer.masterFromFloor;
     var fontsReady = root.document && document.fonts && document.fonts.load
-      ? Promise.all(['600 100px Manrope', '500 30px Manrope', '700 22px Manrope'].map(function (f) { return document.fonts.load(f); })).catch(function () {})
+      ? Promise.all(['600 100px Manrope', '500 30px Manrope', '700 22px Manrope', '600 30px "IBM Plex Sans Arabic"', '500 30px "IBM Plex Sans Arabic"']
+          .map(function (f) { return document.fonts.load(f, AR_PIC ? 'عيادة' : 'A'); })).catch(function () {})
       : Promise.resolve();
     return Promise.all([loadImage(a.master), loadImage(a.plates[u.building][u.fid]), loadImage(a.floors[u.fid]),
       a.logoOrange ? loadImage(a.logoOrange) : Promise.resolve(null), fontsReady])
       .then(function (g) {
         var master = g[0], plate = g[1], plan = g[2], logo = g[3];
-        var W = 1200, F = '"Manrope", "Segoe UI", Arial, sans-serif';
+        var W = 1200, F = '"Manrope", "IBM Plex Sans Arabic", "Segoe UI", Arial, sans-serif';
         var letter = bLetter(o.buildingName, u);
 
         /* ---- the master plan, whole (Ayyam: a broker who does not know
@@ -225,6 +237,8 @@
         cv.width = W; cv.height = H;
         var ctx = cv.getContext('2d');
         ctx.imageSmoothingQuality = 'high';
+        /* Arabic words read right to left; the drawing itself is never mirrored */
+        if (AR_PIC && 'direction' in ctx) ctx.direction = 'rtl';
         ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H);
         ctx.drawImage(master, 0, 0, W, MH);
 
@@ -240,7 +254,7 @@
         ctx.strokeStyle = ORANGE; ctx.lineWidth = 5;
         ctx.strokeRect(e0[0], e0[1], e1[0] - e0[0], e1[1] - e0[1]);
         /* the building's tag, beside it (above would cover the top road) */
-        var tag = 'BUILDING ' + letter;
+        var tag = W8.building(letter);
         ctx.font = '700 22px ' + F;
         var tw = ctx.measureText(tag).width + 28, tx = e0[0] - tw - 12, ty = e0[1] + 6;
         if (tx < 12) tx = e1[0] + 12;
@@ -273,16 +287,17 @@
         }
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = GREY; ctx.font = '700 22px ' + F;
-        var kicker = (USE_EN[u.type] || u.type).toUpperCase();
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
+        var kicker = W8.use(u);
+        if (AR_PIC) ctx.font = '600 26px ' + F;
+        if ('letterSpacing' in ctx && !AR_PIC) ctx.letterSpacing = '4px';   /* Arabic is never letterspaced */
         ctx.fillText(kicker, lx, y + 22);
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
         ctx.fillStyle = TEAL; ctx.font = '600 104px ' + F;
         ctx.fillText(u.code, lx - 4, y + 128);
         ctx.fillStyle = CHAR; ctx.font = '500 40px ' + F;
-        ctx.fillText(money(u.area) + ' m²', lx, y + 190);
+        ctx.fillText(W8.area(u), lx, y + 190);
         ctx.fillStyle = GREY; ctx.font = '500 30px ' + F;
-        ctx.fillText((FLOOR_EN[u.fid] || u.floor) + ' · Building ' + letter, lx, y + 238);
+        ctx.fillText(W8.where(u, letter), lx, y + 238);
         y += 290;
 
         /* the key plan: where this wing sits on the whole floor */
@@ -298,7 +313,7 @@
         if (p.post && p.post.sample) {
           /* the PDF's warning, on the picture itself: a caption can be deleted */
           ctx.font = '700 22px ' + F;
-          var label = 'SAMPLE · terms to be confirmed';
+          var label = W8.sample;
           var sw = ctx.measureText(label).width + 32;
           ctx.fillStyle = ORANGE;
           ctx.beginPath();
@@ -314,7 +329,7 @@
 
   /* ================================================================ sheet */
 
-  var AGENT_KEY = 'mm.agent', LANG_KEY = 'mm.post.lang';
+  var AGENT_KEY = 'mm.agent';
   function readAgent(fallbackName) {
     var a = null;
     try { a = JSON.parse(localStorage.getItem(AGENT_KEY) || 'null'); } catch (e) { a = null; }
@@ -325,8 +340,7 @@
   /* o: { project, line, unit, plan, buildingName, who, session, kit:{handheld, canShare, shareOrTimeOut, saveFile}, demo } */
   function open(o) {
     var el = MM.el, t = MM.t, kit = o.kit;
-    var lang = 'ar';
-    try { lang = localStorage.getItem(LANG_KEY) === 'en' ? 'en' : 'ar'; } catch (e) { /* Arabic: broker groups are Arabic */ }
+    var lang = MM.lang === 'ar' ? 'ar' : 'en';           /* the app's language (js/i18n.js) */
     var agent = readAgent((o.session && o.session.name) || '');
     var file = null, fileUrl = null;
 
@@ -338,19 +352,13 @@
     var hl = el('div');
     hl.appendChild(el('p', 'q-k', o.who && o.who.audience === 'broker' && o.who.company
       ? t('WhatsApp post') + ' · ' + o.who.company : t('WhatsApp post') + ' · ' + t('General broadcast')));
-    var h = el('h3', null, t('Clinic') + ' ' + o.unit.code); h.id = 'qPostH';
+    var h = el('h3', null, t('Clinic {code}', { code: o.unit.code })); h.id = 'qPostH';
     if (o.unit.type !== 'Clinic') h.textContent = o.unit.code;
     hl.appendChild(h);
     head.appendChild(hl);
     var x = el('button', 'q-post-x', '×'); x.type = 'button'; x.setAttribute('aria-label', t('Close'));
     head.appendChild(x);
     card.appendChild(head);
-
-    var langs = el('div', 'q-post-chips');
-    var bAr = el('button', 'q-post-chip', 'العربية'); bAr.type = 'button'; bAr.lang = 'ar';
-    var bEn = el('button', 'q-post-chip', 'English'); bEn.type = 'button';
-    langs.appendChild(bAr); langs.appendChild(bEn);
-    card.appendChild(langs);
 
     var shot = el('div', 'q-post-shot');
     card.appendChild(shot);
@@ -390,20 +398,11 @@
       } catch (e) {
         ta.value = '';
         copy.disabled = send.disabled = true;
-        flash(t('The post could not be made: ') + e.message);
+        flash(t('The post could not be made: {e}', { e: e.message }));
       }
       ta.dir = lang === 'ar' ? 'rtl' : 'ltr';
-      bAr.setAttribute('aria-pressed', String(lang === 'ar'));
-      bEn.setAttribute('aria-pressed', String(lang === 'en'));
       send.disabled = !ta.value || (canPicture(o.project, o.unit) && !file);
     }
-    function setLang(l) {
-      lang = l;
-      try { localStorage.setItem(LANG_KEY, l); } catch (e) { /* not remembered */ }
-      writeText();
-    }
-    bAr.addEventListener('click', function () { setLang('ar'); });
-    bEn.addEventListener('click', function () { setLang('en'); });
     agentOn.addEventListener('change', function () {
       agentBox.hidden = !agentOn.checked;
       saveAgent({ on: agentOn.checked, name: nameIn.value, phone: phoneIn.value });
@@ -477,7 +476,7 @@
     writeText();
     if (canPicture(o.project, o.unit)) {
       shot.appendChild(el('p', 'q-who-note', t('Making the picture…')));
-      picture({ project: o.project, unit: o.unit, buildingName: o.buildingName }).then(function (blob) {
+      picture({ project: o.project, unit: o.unit, buildingName: o.buildingName, lang: lang }).then(function (blob) {
         file = new File([blob], 'Moray Wellness - ' + o.unit.code + '.jpg', { type: 'image/jpeg' });
         fileUrl = URL.createObjectURL(blob);
         shot.textContent = '';
@@ -488,7 +487,7 @@
         writeText();
       }, function (e) {
         shot.textContent = '';
-        shot.appendChild(el('p', 'q-who-note', t('The picture could not be made: ') + e.message + t('. The text can still be sent.')));
+        shot.appendChild(el('p', 'q-who-note', t('The picture could not be made: {e}. The text can still be sent.', { e: e.message })));
         file = null;
         send.disabled = !ta.value;
       });

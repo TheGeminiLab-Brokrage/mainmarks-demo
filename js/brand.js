@@ -21,10 +21,12 @@
   }
 
   /* ---- translation seam ---------------------------------------------
-     English only today. Arabic is a dictionary away and every string on
-     every page already goes through here, so adding it is one file and
-     no rewrites. */
-  function t(s) { return s; }
+     Build 92: English or Arabic, by js/i18n.js (loaded before this file).
+     Without it, the English as written. */
+  function t(s, vars) {
+    if (MM.i18n) return MM.i18n.t(s, vars);
+    return vars ? String(s).replace(/\{(\w+)\}/g, function (m, k) { return vars[k] == null ? m : vars[k]; }) : s;
+  }
 
   /* ---- the sellable rule --------------------------------------------
      Fail closed. No id, an unknown id, the wrong case, or a project that
@@ -77,7 +79,7 @@
      answer "is the phone running the new code?" without a console. */
   function stamp() {
     var n = document.getElementById('buildstamp');
-    if (n && typeof CONFIG !== 'undefined') n.textContent = 'build ' + CONFIG.build;
+    if (n && typeof CONFIG !== 'undefined') n.textContent = t('build {n}', { n: CONFIG.build });
   }
 
   /* The logo assets Main Marks has supplied are black-background JPEGs cut

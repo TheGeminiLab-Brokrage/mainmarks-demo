@@ -12,14 +12,22 @@
    (config `offer.scope`: today the 1st-floor clinics of E02) gets no PDF.
 
      MM.offerPdf.can(project, unit)      -> true if an offer PDF exists for it
-     MM.offerPdf.make({ project, unit, plan, buildingName, buildingRows })
+     MM.offerPdf.make({ project, unit, plan, buildingName, buildingRows, lang })
                                          -> Promise<{ blob, name, pages }>
+
+   Build 92: the PDF comes out in the language the APP is in (MM.lang), as
+   Ayyam's Create offer does. Arabic loads its three IBM Plex Sans Arabic
+   faces and js/arabic.js (the shaper js/pdf.js needs) only when asked for.
    ------------------------------------------------------------------ */
 (function (root) {
   'use strict';
   var MM = root.MM || (root.MM = {});
   var V = (root.CONFIG && CONFIG.build) || '0';
 
+  var FONTS_AR = [
+    ['normal', 'IBMPlexSansArabic-Regular.ttf', 'PlexArabic'], ['medium', 'IBMPlexSansArabic-Medium.ttf', 'PlexArabicMedium'],
+    ['semi', 'IBMPlexSansArabic-SemiBold.ttf', 'PlexArabicSemi']
+  ];
   var FONTS = [
     ['light', 'Manrope-Light.ttf', 'ManropeLight'], ['normal', 'Manrope-Regular.ttf', 'Manrope'],
     ['medium', 'Manrope-Medium.ttf', 'ManropeMedium'], ['semi', 'Manrope-SemiBold.ttf', 'ManropeSemi'],
@@ -64,17 +72,23 @@
     throw new Error('An offer picture has no size marker.');
   }
 
-  var fontCache = null;
-  function fonts() {
-    if (!fontCache) {
-      fontCache = Promise.all(FONTS.map(function (f) {
+  var fontCache = {};
+  function faces(list, lang) {
+    if (!fontCache[lang]) {
+      fontCache[lang] = Promise.all(list.map(function (f) {
         return bytes('vendor/fonts/' + f[1]).then(function (u8) {
-          return { lang: 'en', weight: f[0], file: f[1], family: f[2], base64: base64(u8) };
+          return { lang: lang, weight: f[0], file: f[1], family: f[2], base64: base64(u8) };
         });
       }));
-      fontCache.catch(function () { fontCache = null; });
+      fontCache[lang].catch(function () { delete fontCache[lang]; });
     }
-    return fontCache;
+    return fontCache[lang];
+  }
+  /* the English faces always (Latin-only strings keep them), the Arabic ones for an Arabic offer */
+  function fonts(lang) {
+    if (lang !== 'ar') return faces(FONTS, 'en');
+    return Promise.all([faces(FONTS, 'en'), faces(FONTS_AR, 'ar'), script('js/arabic.js')])
+      .then(function (r) { return r[0].concat(r[1]); });
   }
   var artCache = {};
   function picture(src) {
@@ -92,17 +106,18 @@
   function can(project, unit) { return !!(MM.pdf && MM.pdf.inScope(project, unit)); }
 
   function make(o) {
+    var lang = (o.lang || MM.lang) === 'ar' ? 'ar' : 'en';
     return script('vendor/jspdf.umd.min.js').then(function () {
       var want = MM.pdf.artwork(o.project, o.unit), keys = Object.keys(want).filter(function (k) { return want[k]; });
-      return Promise.all([fonts(), Promise.all(keys.map(function (k) { return picture(want[k]); }))]).then(function (got) {
+      return Promise.all([fonts(lang), Promise.all(keys.map(function (k) { return picture(want[k]); }))]).then(function (got) {
         var art = {};
         keys.forEach(function (k, i) { art[k] = got[1][i]; });
         var doc = MM.pdf.offer({
           jsPDF: root.jspdf.jsPDF, plans: MM.plans, project: o.project, unit: o.unit, plan: o.plan,
           buildingName: o.buildingName, buildingRows: o.buildingRows, floorId: MM.inventory.floorId,
-          art: art, fonts: got[0], date: new Date(), lang: 'en'
+          art: art, fonts: got[0], date: new Date(), lang: lang, arabic: MM.arabic
         });
-        var name = 'Moray Wellness - Clinic ' + o.unit.code + ' - offer (SAMPLE).pdf';
+        var name = 'Moray Wellness - Clinic ' + o.unit.code + ' - offer' + (lang === 'ar' ? ' - Arabic' : '') + ' (SAMPLE).pdf';
         return { blob: doc.output('blob'), name: name, pages: doc.getNumberOfPages() };
       });
     });

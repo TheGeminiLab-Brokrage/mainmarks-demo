@@ -73,7 +73,17 @@
     catch (e) { return null; }             /* another origin's frame: not the demo */
   }
   function money(v) { return Math.round(v).toLocaleString('en-US'); }
-  function day(d) { return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  /* the schedule's date column: Arabic month names are long, so the Arabic table
+     uses day/month/year in figures and stays inside a phone's width */
+  function tday(d) {
+    if (!MM.isArabic) return day(d);
+    var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear();
+  }
+  function day(d) {
+    if (MM.isArabic && MM.tx) return MM.tx.date(d);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
   function pct(f, dp) { return (Math.round(f * Math.pow(10, 2 + (dp || 0))) / Math.pow(10, dp || 0)) + '%'; }
 
   function lineFlow(o) {
@@ -105,10 +115,10 @@
       var lg = new Image();
       lg.className = 'q-logo';
       lg.src = logoSrc;
-      lg.alt = l.name;
+      lg.alt = t(l.name);
       title.appendChild(lg);
-    } else title.appendChild(el('h1', 'q-name', l.name));
-    title.appendChild(el('p', 'q-sub', t(useWord(types[0])) + ' · ' + p.name + (l.place ? ' · ' + l.place : '')));
+    } else title.appendChild(el('h1', 'q-name', t(l.name)));
+    title.appendChild(el('p', 'q-sub', useMany(types[0]) + ' · ' + p.name + (l.place ? ' · ' + t(l.place) : '')));
     wrap.appendChild(title);
 
     /* ---- the sync bar (Qomor #sync) ------------------------------------ */
@@ -130,8 +140,8 @@
        in the select*() functions below. js/finder.js ------------------- */
     var finder = MM.finder ? MM.finder({
       project: p,
-      useWord: t(useWord(types[0])),
-      nameOf: function (key) { var b = byKey(key); return b ? b.name : t('Building ') + key; }
+      useWord: useMany(types[0]),
+      nameOf: function (key) { var b = byKey(key); return b ? b.label : t('Building {b}', { b: key }); }
     }) : null;
     if (finder) wrap.appendChild(finder.node);
     var search = { active: false, match: null, byBuilding: {} };
@@ -156,7 +166,7 @@
     var canvas = el('div', 'q-canvas');
     var base = new Image();
     base.className = 'q-img q-base';
-    base.alt = t(p.name + ' at night — ') + l.name;
+    base.alt = t('{p} at night — {l}', { p: p.name, l: l.name });
     base.draggable = false;
     base.src = p.aerial.img;
     canvas.appendChild(base);
@@ -192,8 +202,8 @@
     s4.appendChild(detail);
     s4.hidden = true;
 
-    wrap.appendChild(el('p', 'src q-src', t('Inventory: ') + (p.inventory.source || p.inventory.url) +
-      t(' · Plans: Main Marks, 29 Sep 2026 · Picture: ') + p.aerial.source));
+    wrap.appendChild(el('p', 'src q-src', t('Inventory: {inv} · Plans: Main Marks, 29 Sep 2026 · Picture: {pic}',
+      { inv: p.inventory.source || p.inventory.url, pic: p.aerial.source })));
 
     /* ---- the aerial's lights and roofs (traced by Muhanad, config) ------ */
     var cfgB = (l.buildings || []).filter(function (b) { return b && b.id; });
@@ -241,7 +251,7 @@
       g.setAttribute('class', 'lp-roof');
       g.setAttribute('tabindex', '0');
       g.setAttribute('role', 'button');
-      g.setAttribute('aria-label', b.name);
+      g.setAttribute('aria-label', bLabel(b.name));
       g.addEventListener('click', function () { selectBuilding(b.id, true); });
       g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectBuilding(b.id, true); } });
       svg.appendChild(g);
@@ -279,10 +289,10 @@
          any building the sheet names that nobody has traced yet */
       var SIDE = { left: 0, right: 1 };
       buildings = cfgB.slice().sort(function (a, c) { return (SIDE[a.side] || 0) - (SIDE[c.side] || 0); })
-        .map(function (b) { return { id: b.id, name: b.name, key: b.inventory || b.id, traced: !!roofs[b.id] }; });
+        .map(function (b) { return { id: b.id, name: b.name, label: bLabel(b.name), key: b.inventory || b.id, traced: !!roofs[b.id] }; });
       rows.forEach(function (u) {
         if (!buildings.some(function (b) { return b.key === u.building; })) {
-          buildings.push({ id: u.building, name: t('Building ') + u.building, key: u.building, traced: false });
+          buildings.push({ id: u.building, name: 'Building ' + u.building, label: t('Building {b}', { b: u.building }), key: u.building, traced: false });
         }
       });
       buildings.forEach(function (b) {
@@ -291,13 +301,13 @@
         b.hold = b.rows.filter(function (u) { return u.status === 'On hold'; }).length;
       });
       var avail = rows.filter(function (u) { return u.sellable; }).length;
-      counts.textContent = rows.length + ' ' + t(useWord(types[0]).toLowerCase()) + ' · ' + avail + t(' available');
+      counts.textContent = t('{n} {use} · {a} available', { n: rows.length, use: useMany(types[0]).toLowerCase(), a: avail });
       sel.textContent = '';
       var ph = el('option', null, t('Choose a building'));
       ph.value = ''; ph.disabled = true; ph.selected = true;
       sel.appendChild(ph);
       buildings.forEach(function (b) {
-        var op = el('option', null, b.name + ' — ' + (b.avail ? b.avail + t(' available') : t('none available')));
+        var op = el('option', null, b.label + ' — ' + (b.avail ? t('{n} available', { n: b.avail }) : t('none available')));
         op.value = b.id;
         sel.appendChild(op);
       });
@@ -315,10 +325,16 @@
       if (finder) finder.node.hidden = empty;
       none.hidden = !empty;
       if (empty) s1.hint.textContent = '';
-      none.textContent = empty ? t('There are no ' + useWord(types[0]).toLowerCase() +
-        ' in Main Marks’ inventory yet. They appear here the moment they are added to the sheet.') : '';
+      none.textContent = empty ? t('There are no {use} in Main Marks’ inventory yet. They appear here the moment they are added to the sheet.',
+        { use: useMany(types[0]).toLowerCase() }) : '';
     }
     function useWord(type) { return USE[type] || type || ''; }
+    /* build 92: the same words in the app's language (js/i18n.js) */
+    function useMany(type) { return MM.tx ? MM.tx.useMany(type, useWord(type)) : useWord(type); }
+    function useOne(type) { var en = useWord(type).replace(/s$/, ''); return MM.tx ? MM.tx.useOne(type, en) : en; }
+    function bLabel(name) { return MM.tx ? MM.tx.building(name) : name; }
+    function planName(label) { return MM.tx ? MM.tx.plan(label) : label; }
+    function egp(v) { return MM.isArabic && MM.tx ? MM.tx.egp(v) : money(v) + ' EGP'; }
     function byKey(key) { return buildings.filter(function (b) { return b.key === key; })[0]; }
 
     /* ---- what the search lights ------------------------------------------
@@ -357,12 +373,12 @@
           badges[b.id].classList.toggle('is-best', isBest);
           badges[b.id].hidden = !shown;
           badges[b.id].textContent = String(n);
-          badges[b.id].setAttribute('aria-label', b.name + ', ' + n + t(' matching units'));
+          badges[b.id].setAttribute('aria-label', t('{name}, {n} matching units', { name: b.label, n: n }));
         }
         if (lights[b.id]) lights[b.id].classList.toggle('is-off', !(b.id === cur.b || (on && shown)));
       });
       relight.hidden = !(on && cur.b && others && !lightAll);
-      relight.textContent = t('Light the other ') + others + (others === 1 ? t(' match') : t(' matches'));
+      relight.textContent = t(others === 1 ? 'Light the other {n} match' : 'Light the other {n} matches', { n: others });
       var b = buildings.filter(function (x) { return x.id === cur.b; })[0];
       if (b && !s2.hidden) renderFloors(b);
       if (b && cur.f && !s3.hidden) { selectFloor(cur.f, true); return; }   /* rows, drawing and step 4 follow the budget */
@@ -381,8 +397,8 @@
         var now = new Date();
         syncText.textContent = '';
         syncText.appendChild(el('b', null, t('Inventory')));
-        syncText.appendChild(document.createTextNode(t(' · read ') +
-          String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0')));
+        syncText.appendChild(document.createTextNode(' · ' + t('read {time}', {
+          time: String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') })));
         if (cur.b) selectBuilding(cur.b, false, true);
       }).catch(function (err) {
         /* fail closed: nothing is offered from a sheet we could not read */
@@ -409,7 +425,7 @@
       sel.value = id;
       chip.textContent = id;
       chip.classList.add('is-on');
-      bmeta.textContent = b.hold ? b.hold + t(' on hold') : '';
+      bmeta.textContent = b.hold ? t('{n} on hold', { n: b.hold }) : '';
       Object.keys(roofs).forEach(function (k) { roofs[k].classList.toggle('is-on', k === id); });
       Object.keys(glows).forEach(function (k) { glows[k].classList.toggle('is-on', k === id); });
       svg.classList.remove('is-idle');
@@ -423,7 +439,7 @@
     function floorName(fid) {
       var f = (p.floors || []).filter(function (x) { return x.id === fid; })[0];
       if (fid === 'street') return t('Street level');
-      return f ? t(f.name + ' Floor') : fid;
+      return f ? (MM.tx ? MM.tx.floor(fid, f.name + ' Floor') : f.name + ' Floor') : fid;
     }
 
     function renderFloors(b) {
@@ -444,10 +460,10 @@
         var r = el('div', 'q-row');
         r.appendChild(el('span', 'q-id', CODE[fid] || fid));
         r.appendChild(el('span', 'q-pill' + (av ? '' : ' none'),
-          hits ? hits + t(' match') : (av ? av + t(' available') : t('none available'))));
+          hits ? t(hits === 1 ? '{n} match' : '{n} matches', { n: hits }) : (av ? t('{n} available', { n: av }) : t('none available'))));
         card.appendChild(r);
         card.appendChild(el('span', 'q-val', floorName(fid)));
-        card.appendChild(el('span', 'q-lab', useWord(types[0]) + (hold ? ' · ' + hold + t(' on hold') : '')));
+        card.appendChild(el('span', 'q-lab', useMany(types[0]) + (hold ? ' · ' + t('{n} on hold', { n: hold }) : '')));
         /* the floor that holds the answer carries it, in green */
         var here = on.filter(isAnswer)[0];
         if (here) {
@@ -551,7 +567,7 @@
       back.src = f.img;
       var lift = el('div', 'q-plate-lift');
       lift.setAttribute('role', 'img');
-      lift.setAttribute('aria-label', b.name + ' · ' + floorName(fid) + t(' · layout'));
+      lift.setAttribute('aria-label', b.label + ' · ' + floorName(fid) + ' · ' + t('layout'));
       /* a sharp picture of exactly this cut, when there is one (config `plateImgs`) */
       var sharp = p.plateImgs && p.plateImgs[b.key] && p.plateImgs[b.key][fid];
       lift.style.backgroundImage = 'url("' + (sharp || f.img) + '")';
@@ -566,8 +582,8 @@
       var ansU = (rows || []).filter(isAnswer)[0];
       if (ansU) {
         var traced = !!(units && units.querySelector('.q-u.is-best'));
-        holder.appendChild(el('p', 'q-plate-ans', ansU.code + ' · ' + t(TAG[search.kind] || 'Best fit') +
-          (traced ? t('. Glowing on the drawing.') : t('. First in the list below.'))));
+        holder.appendChild(el('p', 'q-plate-ans', ansU.code + ' · ' + t(TAG[search.kind] || 'Best fit') + '. ' +
+          (traced ? t('Glowing on the drawing.') : t('First in the list below.'))));
       }
       /* Muhanad, 2026-10-02: the best fit alone by default; one button lights
          the rest that fit, in their own colour. Only while a budget is typed
@@ -579,7 +595,7 @@
         var label = function () {
           more.setAttribute('aria-pressed', String(showOthers));
           more.textContent = showOthers ? t('Hide other options') :
-            t('Show other options') + ' (' + n + t(' on this floor') + ')';
+            t('Show other options ({n} on this floor)', { n: n });
         };
         label();
         more.addEventListener('click', function () {
@@ -589,7 +605,7 @@
         });
         holder.appendChild(more);
       }
-      holder.appendChild(el('p', 'q-plate-src', t('Drawing: ') + (f.source || p.name) + (sharp ? t(' · sharpened copy') : '')));
+      holder.appendChild(el('p', 'q-plate-src', t('Drawing: {src}', { src: f.source || p.name }) + (sharp ? ' · ' + t('sharpened copy') : '')));
 
       var shown = false;
       function lay() {
@@ -651,10 +667,10 @@
       [].forEach.call(floorsGrid.children, function (c) { c.classList.toggle('is-on', c.dataset.floor === fid); });
       var on = b.rows.filter(function (u) { return u.fid === fid; });
       var av = on.filter(function (u) { return u.sellable; });
-      s3.hint.textContent = '— ' + av.length + t(av.length === 1 ? ' available on this floor' : ' available on this floor');
+      s3.hint.textContent = '— ' + t('{n} available on this floor', { n: av.length });
       unitPanel.textContent = '';
       var head = el('div', 'q-phead');
-      head.appendChild(el('p', 'q-pcount', b.name + ' · ' + floorName(fid)));
+      head.appendChild(el('p', 'q-pcount', b.label + ' · ' + floorName(fid)));
       var sort = el('select', 'q-select q-sort');
       sort.setAttribute('aria-label', t('Sort the units'));
       [['code', 'Sort: unit number'], ['price', 'Sort: price, low to high'], ['priceD', 'Sort: price, high to low'], ['area', 'Sort: size, small to large']]
@@ -689,15 +705,15 @@
         var row = el(u.sellable ? 'button' : 'div', 'q-unit' + (u.sellable ? '' : ' is-held'));
         if (u.sellable) row.type = 'button';
         row.appendChild(el('span', 'q-ucode', u.code));
-        row.appendChild(el('span', 'q-umeta', money(u.area) + ' m² · ' + useWord(u.type).replace(/s$/, '')));
-        row.appendChild(el('span', 'q-uprice', u.sellable ? money(u.listPrice) : u.status));
+        row.appendChild(el('span', 'q-umeta', t('{a} m²', { a: money(u.area) }) + ' · ' + useOne(u.type)));
+        row.appendChild(el('span', 'q-uprice', u.sellable ? money(u.listPrice) : (MM.tx ? MM.tx.status(u.status) : u.status)));
         var fo = fitOf(u), ans = isAnswer(u);
-        var plan = fo ? t(fo.label) + ' · ' +
-          (fo.cash ? money(fo.down) + t(' cash') : money(fo.down) + t(' down · ') + money(fo.each) + t(' / quarter')) : '';
+        var plan = fo ? planName(fo.label) + ' · ' +
+          (fo.cash ? t('{v} cash', { v: money(fo.down) }) : t('{down} down · {each} / quarter', { down: money(fo.down), each: money(fo.each) })) : '';
         if (ans) {
           row.appendChild(el('span', 'q-ufit is-best', t(TAG[search.kind] || 'Best fit') + (plan ? ' · ' + plan : '')));
           row.classList.add('is-best');
-        } else if (fo) row.appendChild(el('span', 'q-ufit', t('Fits · ') + plan));
+        } else if (fo) row.appendChild(el('span', 'q-ufit', t('Fits') + ' · ' + plan));
         if (u.sellable) {
           row.classList.toggle('is-on', cur.u === u.code);
           row.addEventListener('click', function () { selectUnit(u.code); });
@@ -748,9 +764,9 @@
       var b = buildings.filter(function (x) { return x.id === cur.b; })[0];
 
       var card = el('div', 'q-unitcard');
-      [['Unit', u.code], ['Floor', floorName(u.fid)], ['Type', useWord(u.type).replace(/s$/, '')],
-       ['Area', money(u.area) + ' m²'], ['Price', money(u.listPrice) + ' EGP'],
-       ['Price per m²', money(u.listPrice / u.area) + ' EGP/m²']].forEach(function (x) {
+      [['Unit', u.code], ['Floor', floorName(u.fid)], ['Type', useOne(u.type)],
+       ['Area', t('{a} m²', { a: money(u.area) })], ['Price', egp(u.listPrice)],
+       ['Price per m²', t('{v} EGP/m²', { v: money(u.listPrice / u.area) })]].forEach(function (x) {
         var c = el('div');
         c.appendChild(el('span', 'q-lab', t(x[0])));
         c.appendChild(el('span', 'q-v', x[1]));
@@ -774,10 +790,10 @@
         var gk = pl.group || 'other';
         if (!groups[gk]) {
           groups[gk] = el('optgroup');
-          groups[gk].label = (p.planGroups && p.planGroups[gk]) || t('Plans');
+          groups[gk].label = t((p.planGroups && p.planGroups[gk]) || 'Plans');
           ps.appendChild(groups[gk]);
         }
-        var op = el('option', null, t(pl.label));
+        var op = el('option', null, planName(pl.label));
         op.value = pl.id;
         groups[gk].appendChild(op);
       });
@@ -811,10 +827,10 @@
         send.disabled = copy.disabled = false;
         current = { u: u, pl: pl, s: s, b: b };
         var tiles = el('div', 'q-tiles');
-        function tile(k, v) { var d = el('div', 'q-tile'); d.appendChild(el('span', 'q-lab', t(k))); d.appendChild(el('span', 'q-v', v)); tiles.appendChild(d); }
-        if (s.discount && !s.cash) tile('Price after ' + pct(s.discountPct) + ' off', money(s.payable));
+        function tile(k, v, vars) { var d = el('div', 'q-tile'); d.appendChild(el('span', 'q-lab', t(k, vars))); d.appendChild(el('span', 'q-v', v)); tiles.appendChild(d); }
+        if (s.discount && !s.cash) tile('Price after {p} off', money(s.payable), { p: pct(s.discountPct) });
         if (s.cash) {
-          tile('Cash payment · ' + pct(s.discountPct) + ' off', money(s.payable));
+          tile('Cash payment · {p} off', money(s.payable), { p: pct(s.discountPct) });
           tile('You save', money(s.discount));
         } else {
           tile('Down payment', money(s.down));
@@ -829,25 +845,26 @@
       /* against what the agent typed in Find a unit: fits, or by how much it
          is over, and one tap to the plan that does fit */
       function budgetCheck(s) {
-        var B = search.budget, needC = B.cash ? s.down - B.cash : 0;
-        var needQ = (B.quarter && !s.cash) ? Math.max(s.each, s.lastInstalment) - B.quarter : 0;
+        /* a box the agent left empty is zero, never "no limit" (finder.js) */
+        var B = search.budget, needC = s.down - (B.cash || 0);
+        var needQ = !s.cash ? Math.max(s.each, s.lastInstalment) - (B.quarter || 0) : 0;
         var box = el('div', 'q-budget');
         if (needC <= 0 && needQ <= 0) {
           box.classList.add('is-ok');
           var have = [];
-          if (B.cash) have.push(money(s.down) + t(' down of ') + money(B.cash));
-          if (B.quarter && !s.cash) have.push(money(s.each) + t(' a quarter of ') + money(B.quarter));
-          box.appendChild(el('p', null, t('Within the client’s budget: ') + have.join(' · ') + '.'));
+          if (B.cash) have.push(t('{v} down of {of}', { v: money(s.down), of: money(B.cash) }));
+          if (B.quarter && !s.cash) have.push(t('{v} a quarter of {of}', { v: money(s.each), of: money(B.quarter) }));
+          box.appendChild(el('p', null, t('Within the client’s budget: {list}.', { list: have.join(' · ') })));
           return box;
         }
         box.classList.add('is-over');
         var gaps = [];
-        if (needC > 0) gaps.push(money(needC) + t(' more cash'));
-        if (needQ > 0) gaps.push(money(needQ) + t(' more a quarter'));
-        box.appendChild(el('p', null, t('Over the client’s budget on this plan: needs ') + gaps.join(t(' and ')) + '.'));
+        if (needC > 0) gaps.push(t('{v} more cash', { v: money(needC) }));
+        if (needQ > 0) gaps.push(t('{v} more a quarter', { v: money(needQ) }));
+        box.appendChild(el('p', null, t('Over the client’s budget on this plan: needs {list}.', { list: gaps.join(t(' and ')) })));
         var fo = fitOf(u);
         if (fo && fo.id !== ps.value) {
-          var sw = el('button', 'q-ghost q-tiny', t('Switch to ') + t(fo.label));
+          var sw = el('button', 'q-ghost q-tiny', t('Switch to {plan}', { plan: planName(fo.label) }));
           sw.type = 'button';
           sw.addEventListener('click', function () { ps.value = fo.id; draw(); });
           box.appendChild(sw);
@@ -859,18 +876,19 @@
 
       function offerText() {
         var c = current, s = c.s, lines = [];
-        lines.push('*' + l.name + ' · ' + t(useWord(c.u.type).replace(/s$/, '')) + ' ' + c.u.code + '*');
-        lines.push(c.b.name + ' · ' + floorName(c.u.fid) + ' · ' + money(c.u.area) + ' m²');
-        lines.push(t('Price: ') + money(c.u.listPrice) + ' EGP');
-        lines.push(t('Plan: ') + t(c.pl.label) + (c.pl.until ? t(' (offer until ') + day(new Date(c.pl.until + 'T12:00:00')) + ')' : ''));
-        if (s.discount) lines.push(t('Price after ') + pct(s.discountPct) + t(' off: ') + money(s.payable) + ' EGP');
-        if (s.cash) lines.push(t('Cash payment: ') + money(s.payable) + ' EGP');
+        lines.push('*' + l.name + ' · ' + useOne(c.u.type) + ' ' + c.u.code + '*');
+        lines.push(c.b.label + ' · ' + floorName(c.u.fid) + ' · ' + t('{a} m²', { a: money(c.u.area) }));
+        lines.push(t('Price: {v}', { v: egp(c.u.listPrice) }));
+        lines.push(t('Plan: {plan}', { plan: planName(c.pl.label) }) +
+          (c.pl.until ? ' ' + t('(offer until {date})', { date: day(new Date(c.pl.until + 'T12:00:00')) }) : ''));
+        if (s.discount) lines.push(t('Price after {p} off: {v}', { p: pct(s.discountPct), v: egp(s.payable) }));
+        if (s.cash) lines.push(t('Cash payment: {v}', { v: egp(s.payable) }));
         else {
-          lines.push(t('Down payment: ') + money(s.down) + ' EGP');
-          lines.push(t('Quarterly instalment: ') + money(s.each) + ' EGP × ' + s.count);
+          lines.push(t('Down payment: {v}', { v: egp(s.down) }));
+          lines.push(t('Quarterly instalment: {v} × {n}', { v: egp(s.each), n: s.count }));
         }
         lines.push('');
-        lines.push(t('Available as of ') + day(new Date()) + (session.name ? ' · ' + session.name : '') + ' · Main Marks');
+        lines.push(t('Available as of {date}', { date: day(new Date()) }) + (session.name ? ' · ' + session.name : '') + ' · Main Marks');
         return lines.join('\n');
       }
       /* window.open must fire in the click itself, before anything async:
@@ -1144,7 +1162,7 @@
           drop.hidden = true; inp.setAttribute('aria-expanded', 'false'); return;
         }
         if (!m.length) {
-          drop.appendChild(el('li', 'q-who-none', t('No company in the list is close to “') + typed + t('”. It will be kept as typed.')));
+          drop.appendChild(el('li', 'q-who-none', t('No company in the list is close to “{typed}”. It will be kept as typed.', { typed: typed })));
         }
         if (hi >= m.length) hi = m.length - 1;
         m.forEach(function (n, i) {
@@ -1252,8 +1270,8 @@
       box.setAttribute('role', 'region');
       box.setAttribute('aria-label', t('Payment schedule'));
       wrap.appendChild(box);
-      wrap.appendChild(el('p', 'q-sched-hint', t('Year ') + (FIRST_YEARS + 1) + t(' to Year ') + lastY + ' · ' +
-        later.length + (later.length === 1 ? t(' more payment') : t(' more payments')) + t(' · scroll the table')));
+      wrap.appendChild(el('p', 'q-sched-hint', t('Year {a} to Year {b}', { a: FIRST_YEARS + 1, b: lastY }) + ' · ' +
+        t(later.length === 1 ? '{n} more payment' : '{n} more payments', { n: later.length }) + ' · ' + t('scroll the table')));
       /* the box ends exactly where Year 4 starts, once it is on screen */
       requestAnimationFrame(function () { fitSched(box); });
       return wrap;
@@ -1281,9 +1299,9 @@
         if (r.kind === 'down') {
           if (!r.amount) return;                       /* 0% down: no row */
           tr.className = 'is-dp';
-          tr.appendChild(el('td', null, 'DP'));
+          tr.appendChild(el('td', null, t('DP')));
           tr.appendChild(el('td', null, t('Down payment')));
-          tr.appendChild(el('td', null, day(r.due)));
+          tr.appendChild(el('td', null, tday(r.due)));
           tr.appendChild(el('td', 'num', money(r.amount)));
           tr.appendChild(el('td', 'num', pct(r.amount / s.payable, 2)));
           tr.appendChild(el('td', 'num', pct(r.amount / s.payable, 2)));
@@ -1291,9 +1309,9 @@
           var y = Math.ceil(r.months / 12), first = !seenYear[y];
           seenYear[y] = true;
           if (first) tr.className = 'is-year';
-          tr.appendChild(el('td', null, first ? t('Year ') + y : ''));
-          tr.appendChild(el('td', null, t('Inst. ') + r.no));
-          tr.appendChild(el('td', null, day(r.due)));
+          tr.appendChild(el('td', null, first ? t('Year {y}', { y: y }) : ''));
+          tr.appendChild(el('td', null, t('Inst. {n}', { n: r.no })));
+          tr.appendChild(el('td', null, tday(r.due)));
           tr.appendChild(el('td', 'num', money(r.amount)));
           tr.appendChild(el('td', 'num', pct(r.amount / s.payable, 2)));
           tr.appendChild(el('td', 'num', first ? pct(yearly[y] / s.payable, 2) : ''));

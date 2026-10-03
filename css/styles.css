@@ -3169,3 +3169,30 @@ body.is-ready .mv-hint { opacity: 1; }
 .q-budget p { margin: 0; flex: 1 1 220px; }
 .q-budget.is-ok { background: rgba(126, 200, 255, .08); border: 1px solid rgba(126, 200, 255, .45); }
 .q-budget.is-over { background: rgba(255, 255, 255, .03); border: 1px dashed var(--q-edge-hi); color: var(--q-dim); }
+
+/* ---- build 92: English / Arabic (js/i18n.js) -------------------------
+   The switch sits in the header card beside the initials (Ayyam puts it in
+   its header), and at the top of the sign-in form. The page turns right to
+   left in Arabic; drawings, renders and the master plan are never mirrored. */
+.top { grid-template-columns: minmax(0, 1fr) auto auto; }
+.lang-switch {
+  justify-self: end; height: 30px; padding: 0 12px; border-radius: 15px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--white);
+  background: color-mix(in srgb, var(--white) 8%, transparent); border: 1px solid var(--rule);
+}
+.lang-switch:lang(ar) { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif; font-size: 13.5px; }
+.lang-switch:hover, .lang-switch:focus-visible { border-color: var(--orange); outline: none; }
+.lang-switch.is-gate { align-self: flex-end; margin-top: 14px; }
+/* Arabic is never letterspaced or upper-cased */
+[dir="rtl"] * { letter-spacing: 0 !important; }
+[dir="rtl"] body { font-family: 'IBM Plex Sans Arabic', 'Manrope', system-ui, sans-serif; }
+/* pictures keep their own left and right */
+[dir="rtl"] .q-canvas, [dir="rtl"] .a-stage, [dir="rtl"] .q-plate, [dir="rtl"] .q-plate-lift, [dir="rtl"] svg { direction: ltr; }
+/* the step marker sits on the reading side */
+[dir="rtl"] .steps .now::before { margin-right: 0; margin-left: -6px; }
+[dir="rtl"] .who-menu { right: auto; left: 0; }
+/* figures, codes and the schedule's amounts stay left to right inside a line */
+[dir="rtl"] .q-sched td.num, [dir="rtl"] .q-sched th:nth-child(n+4) { text-align: left; }
+[dir="rtl"] .q-who-in, [dir="rtl"] .q-post-text { text-align: right; }
+/* back points the way Arabic reads: to the right */
+[dir="rtl"] .back svg, [dir="rtl"] .q-cta svg, [dir="rtl"] .signin-btn svg:not(.tick), [dir="rtl"] .c-go svg, [dir="rtl"] .l-go svg { transform: scaleX(-1); }

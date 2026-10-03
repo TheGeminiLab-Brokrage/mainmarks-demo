@@ -45,7 +45,7 @@
 
     var img = new Image();
     img.src = mp.img;
-    img.alt = t(p.name + ' master plan');
+    img.alt = t('{name} master plan', { name: p.name });
     wrap.appendChild(img);
 
     var svg = svgEl('svg', {
@@ -62,7 +62,7 @@
 
     (mp.hotspots || []).forEach(function (h) {
       var g = svgEl('g', { class: 'mp-b', tabindex: '0', role: 'button' });
-      g.setAttribute('aria-label', t('Building ') + h.id);
+      g.setAttribute('aria-label', t('Building {b}', { b: h.id }));
 
       var poly = svgEl('polygon', {
         points: h.points.map(function (pt) { return pt[0] + ',' + pt[1]; }).join(' '),
@@ -118,7 +118,7 @@
       Object.keys(labels).forEach(function (k) {
         var e = counts[k];
         var avail = e ? e.available : 0;
-        labels[k].n.textContent = e ? (avail + MM.t(' available')) : MM.t('none');
+        labels[k].n.textContent = e ? MM.t('{n} available', { n: avail }) : MM.t('none');
         labels[k].tag.classList.toggle('is-empty', !avail);
         if (shapes[k]) shapes[k].classList.toggle('is-empty', !avail);
       });

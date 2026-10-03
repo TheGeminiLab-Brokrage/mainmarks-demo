@@ -50,7 +50,7 @@
   /* Then the project, by the shared rule. */
   var p = MM.sellableProject(id);
   if (!p || !MM.auth.maySell(id)) {
-    refuse(p ? 'This project is not open for your account.' : 'This project is not open yet.');
+    refuse(t(p ? 'This project is not open for your account.' : 'This project is not open yet.'));
     return;
   }
 
@@ -65,7 +65,7 @@
   if (lineId !== null) {
     for (var li = 0; li < lines.length; li++) if (lines[li].id === lineId) ln = lines[li];
     if (!ln) {
-      refuse('This part of ' + p.name + ' is not open.', 'project.html?p=' + encodeURIComponent(p.id), 'Back to ' + p.name);
+      refuse(t('This part of {name} is not open.', { name: p.name }), 'project.html?p=' + encodeURIComponent(p.id), t('Back to {name}', { name: p.name }));
       return;
     }
   }
@@ -80,7 +80,7 @@
     if (bk) {
       bk.href = 'project.html?p=' + encodeURIComponent(p.id);
       var bs = bk.querySelector('span');
-      if (bs) bs.textContent = t(p.name);
+      if (bs) bs.textContent = p.name;
     }
   }
 
@@ -88,7 +88,7 @@
   var whoBox = document.getElementById('who');
   if (whoBox) {
     MM.whoMenu(whoBox, session, {
-      role: (CONFIG.roles[session.role] || {}).label || session.role,
+      role: t((CONFIG.roles[session.role] || {}).label || session.role),
       onOut: function () { MM.auth.signOut(); MM.leave('login.html', { replace: true }); }
     });
   }
@@ -133,7 +133,7 @@
     var shot = el('div', 'p-shot');
     var img = new Image();
     img.src = p.render;
-    img.alt = t(p.name + ' — project render');
+    img.alt = t('{name} — project render', { name: p.name });
     shot.appendChild(img);
     hero.appendChild(shot);
   }
@@ -142,7 +142,7 @@
   var lines = el('div', 'p-lines');
   if (p.mark) lines.appendChild(el('p', 'eyebrow', p.mark));
   if (p.promise) lines.appendChild(el('p', 'p-promise', p.promise));
-  lines.appendChild(el('p', 'p-place', [p.kind, p.place].filter(Boolean).join(' · ')));
+  lines.appendChild(el('p', 'p-place', [p.kind && t(p.kind), p.place && t(p.place)].filter(Boolean).join(' · ')));
   lock.appendChild(lines);
   hero.appendChild(lock);
   if (p.blurb) hero.appendChild(el('p', 'p-blurb', p.blurb));
@@ -166,7 +166,7 @@
     var stage = el('div', 'a-stage');
     var base = new Image();
     base.src = p.aerial.img;
-    base.alt = t(p.name + ' — aerial view of the complex');
+    base.alt = t('{name} — aerial view of the complex', { name: p.name });
     base.className = 'a-img';
     stage.appendChild(base);
     lines.forEach(function (l) {
@@ -188,7 +188,7 @@
     var ls = el('div', 'p-lines');
     if (p.mark) ls.appendChild(el('p', 'eyebrow', p.mark));
     if (p.promise) ls.appendChild(el('p', 'p-promise', p.promise));
-    ls.appendChild(el('p', 'p-place', [p.kind, p.place].filter(Boolean).join(' · ')));
+    ls.appendChild(el('p', 'p-place', [p.kind && t(p.kind), p.place && t(p.place)].filter(Boolean).join(' · ')));
     lock.appendChild(ls);
     hero.appendChild(stage);
     /* under the picture, not on it: its foot is the front row of
@@ -207,7 +207,7 @@
     var on = id && litLayers[id];
     if (aTag) {
       var name = '';
-      lines.forEach(function (l) { if (l.id === id) name = l.name; });
+      lines.forEach(function (l) { if (l.id === id) name = t(l.name); });
       if (on) aTag.textContent = name;
       aTag.classList.toggle('is-on', !!on);
     }
@@ -307,7 +307,7 @@
       grid.appendChild(c);
     });
     facts.appendChild(grid);
-    if (p.factsSource) facts.appendChild(el('p', 'src', t('Source: ') + p.factsSource));
+    if (p.factsSource) facts.appendChild(el('p', 'src', t('Source: {s}', { s: p.factsSource })));
     return facts;
   }
   /* inside a line the project's facts give way to the line's own */
@@ -327,7 +327,7 @@
       row.appendChild(c);
     });
     pil.appendChild(row);
-    if (p.pillarsSource) pil.appendChild(el('p', 'src', t('Source: ') + p.pillarsSource));
+    if (p.pillarsSource) pil.appendChild(el('p', 'src', t('Source: {s}', { s: p.pillarsSource })));
     page.appendChild(pil);
   }
 
@@ -343,12 +343,12 @@
       c.appendChild(el('h3', null, x.name));
       /* a count only where the client printed one — Moray's brochure
          gives sizes, not counts, and a blank beats a guess */
-      if (x.units != null) c.appendChild(el('p', 'k-n', String(x.units) + t(' units')));
+      if (x.units != null) c.appendChild(el('p', 'k-n', t('{n} units', { n: x.units })));
       c.appendChild(el('p', 'k-r', x.from.toLocaleString('en-US') + ' – ' + x.to.toLocaleString('en-US') + ' m²'));
       kr.appendChild(c);
     });
     k.appendChild(kr);
-    if (p.kindsSource) k.appendChild(el('p', 'src', t('Source: ') + p.kindsSource));
+    if (p.kindsSource) k.appendChild(el('p', 'src', t('Source: {s}', { s: p.kindsSource })));
     page.appendChild(k);
   }
 
@@ -370,7 +370,7 @@
       mp.appendChild(soon(t('The building outlines are approximate.'),
         t('They are traced on a crop of the brochure page, and the render draws HB and HA as one roof, so the line between those two is placed midway between their printed labels. Main Marks’ own master plan file replaces them — and is what the unit-level pins need.')));
     }
-    if (p.masterplan.source) mp.appendChild(el('p', 'src', t('Source: ') + p.masterplan.source));
+    if (p.masterplan.source) mp.appendChild(el('p', 'src', t('Source: {s}', { s: p.masterplan.source })));
 
     /* The same complex in three dimensions. It sits BESIDE the drawing
        rather than replacing it: the drawing is what picks a building
@@ -433,7 +433,7 @@
       var leg = el('div', 'legend');
       (f.legend || []).forEach(function (l) { leg.appendChild(el('span', 'l-chip', l)); });
       view.appendChild(leg);
-      cap.textContent = t('Source: ') + (f.source || '');
+      cap.textContent = t('Source: {s}', { s: f.source || '' });
     }
 
     fp.appendChild(tabs);
@@ -515,21 +515,21 @@
       var d = el('button', 'l-dot');
       d.type = 'button';
       d.setAttribute('data-line', l.id);
-      d.setAttribute('aria-label', t('Show ') + l.name);
+      d.setAttribute('aria-label', t('Show {name}', { name: t(l.name) }));
       d.style.setProperty('--l-accent', l.accent);
       dots.appendChild(d);
     });
     s.appendChild(dots);
-    s.appendChild(el('p', 'src', t('Pictures and figures: ') + lines.map(function (l) {
+    s.appendChild(el('p', 'src', t('Pictures and figures: {list}', { list: lines.map(function (l) {
       return l.name + ' — ' + l.factsSource;
-    }).join('; ')));
+    }).join('; ') })));
     return s;
   }
 
   function lineCard(l) {
     var a = el('a', 'l-card');
     a.href = 'project.html?p=' + encodeURIComponent(p.id) + '&line=' + encodeURIComponent(l.id);
-    a.setAttribute('aria-label', t('Open ') + l.name);
+    a.setAttribute('aria-label', t('Open {name}', { name: t(l.name) }));
     a.style.setProperty('--l-accent', l.accent);
     a.style.setProperty('--l-ground', l.ground);
     a.style.setProperty('--l-ink', l.ink);
@@ -563,18 +563,18 @@
     /* The kind of unit sits in the copy, not as a pill on the picture:
        two of these pictures are the brand's own compositions, and a
        badge on top of them would break the CI's layout. */
-    meta.appendChild(el('p', 'l-kind', l.badge));
-    meta.appendChild(el('p', 'l-line', l.line));
+    meta.appendChild(el('p', 'l-kind', t(l.badge)));
+    meta.appendChild(el('p', 'l-line', t(l.line)));
     var dl = el('dl', 'c-facts');
     (l.facts || []).forEach(function (f) {
       var w = el('div');
-      w.appendChild(el('dt', null, f.k));
-      w.appendChild(el('dd', null, f.v));
+      w.appendChild(el('dt', null, t(f.k)));
+      w.appendChild(el('dd', null, t(f.v)));
       dl.appendChild(w);
     });
     meta.appendChild(dl);
     var go = el('div', 'l-go');
-    go.appendChild(el('span', null, t('Open ') + l.name));
+    go.appendChild(el('span', null, t('Open {name}', { name: t(l.name) })));
     go.appendChild(arrow());
     meta.appendChild(go);
     a.appendChild(meta);
@@ -734,11 +734,11 @@
       var shot = el('div', 'l-hero-shot');
       var im = new Image();
       im.src = l.img;
-      im.alt = t(l.name + ' — ' + p.name);
+      im.alt = l.name + ' — ' + p.name;
       shot.appendChild(im);
       hero.appendChild(shot);
     }
-    var src = el('p', 'src', t('Source: ') + l.factsSource + t('; picture: ') + l.imgSource);
+    var src = el('p', 'src', t('Source: {a}; picture: {b}', { a: l.factsSource, b: l.imgSource }));
     var wrap = el('div');
     wrap.appendChild(hero);
     wrap.appendChild(src);
@@ -780,9 +780,9 @@
   function refuse(msg, backHref, backLabel) {
     var box = el('section', 'blocked');
     box.appendChild(el('p', 'eyebrow', t('Not available')));
-    box.appendChild(el('h1', null, t(msg)));
+    box.appendChild(el('h1', null, msg));             /* already in the app's language */
     box.appendChild(el('p', null, t('Only projects that have been released, and opened for your account, can be selected.')));
-    var a = el('a', 'btn', t(backLabel || 'Back to all projects'));
+    var a = el('a', 'btn', backLabel || t('Back to all projects'));
     a.href = backHref || 'projects.html';
     box.appendChild(a);
     page.appendChild(box);

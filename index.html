@@ -1057,7 +1057,7 @@
         var pane = [].filter.call(doc().querySelectorAll('.fd-pane'), function (p) { return !p.hidden; })[0];
         var fb = pane.querySelector('.fd-floor-btn');
         return show(t, fb).then(function () { return tap(t, fb); }).then(function () {
-          var chip = [].filter.call(pane.querySelectorAll('.fd-floor-menu .fd-chip'), function (c) { return c.textContent.trim() === '1st'; })[0];
+          var chip = [].filter.call(pane.querySelectorAll('.fd-floor-menu .fd-chip'), function (c) { return ['1st', 'الأول'].indexOf(c.textContent.trim()) !== -1; })[0];   /* the app in English or Arabic (build 92) */
           return tap(t, chip);
         });
       })
