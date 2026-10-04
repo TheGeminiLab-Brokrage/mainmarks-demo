@@ -14,7 +14,7 @@ const CONFIG = {
   /* Bumped on every deploy, and matched by the ?v= on every script tag in
      the HTML. That pair is what stops a returning phone running yesterday's
      JavaScript. See README, "Deploying". */
-  build: 96,
+  build: 99,
 
   /* Where the activity log is sent. Empty = kept on the device only, which
      is where it is today. Filling this in is the whole change when the
@@ -646,8 +646,17 @@ const CONFIG = {
          0.6 brochure px off). Its E121 read "66 m2"; the brochure p.20 prints 56 m2, so the "5" of E122's
          "55 m2" from the same picture was put over the first "6". Every other figure matches the brochure,
          and the seven for sale match the sheet. Built by the image check, not by hand: re-make, never edit. */
+      /* E02 second and A third (build 98, 2026-10-05): AI-sharpened copies of the brochure crop, as
+         E02 first is. Muhanad found the build-97 pictures (the brochure's own pixels, sharpened by
+         scripts/make-sharp-plate.js) too soft. The AI keeps the drawing but stretches it unevenly, so
+         scripts/fit-ai-plate.js moves each measured wall back onto the brochure's wall (left and right
+         columns separately) and cuts exactly the box. Every label was read against the brochure
+         (PDF p.21, p.22) and, for the 23 units for sale, the sheet: all agree. Small symbols (door
+         swings, the shaft by E232/E233) are the AI's drawing, not the brochure's. The AI originals are
+         in `04 Floor plans & units`. */
       plateImgs: {
-        'E02': { first: 'img/moray-plate-E02-first.webp' }
+        'E02': { first: 'img/moray-plate-E02-first.webp', second: 'img/moray-plate-E02-second.webp' },
+        'A': { third: 'img/moray-plate-A-third.webp' }
       },
 
       /* The clinic offer PDF (js/pdf.js, build 78). Muhanad, 2026-10-02: "the
@@ -700,20 +709,66 @@ const CONFIG = {
         clinicQuotePage: 37
       },
 
-      /* Unit outlines on the floor drawings — traced by hand by Muhanad in tools/trace-units.html, 2026-10-02.
+      /* Unit outlines on the floor drawings — traced by hand by Muhanad in tools/trace-units.html (2026-10-02, 2026-10-05).
          Corners [x, y] in px of img/moray-plan-<floor>.webp: the same space as `plates`.
          Step 3 draws them over the lifted building; a sellable one is tapped to open it (js/lineflow.js unitLayer).
-         Checked on arrival: every outline within 9% of the size its m² in the sheet implies; none leaves its cut.
-         NOT TRACED YET: E211-E235 (2nd floor, 21), A333A, A336. Untraced units are picked from the list. */
+         EVERY unit printed on the drawing is traced, not only the ones in the sheet: an outline is drawn only when
+         the sheet has that code, so a unit Main Marks adds later opens by itself.
+         Checked on arrival (2026-10-05): every outline within 12% of the size its printed m² implies, none leaves its cut,
+         no overlap beyond a half-pixel sliver between E116 and E117.
+         NOT TRACED YET: Building A, 3rd floor (23). Untraced units are picked from the list. */
       unitShapes: {
         /* Building E · 1st floor */
+        'E111': [[1183, 582], [1256.5, 582], [1256.5, 588.5], [1256, 592.5], [1255, 595], [1253, 597.5], [1249.5, 600.5], [1245.5, 602], [1240.5, 602.5], [1183, 602.5]],
+        'E112': [[1183, 559], [1257, 559], [1257, 580], [1183, 580]],
         'E113': [[1183, 548], [1203.5, 547.5], [1203, 534.5], [1237.5, 534.5], [1237, 516], [1256, 516], [1257, 559], [1183, 558.5]],
         'E114': [[1183, 429.5], [1256, 429.5], [1256, 472], [1237, 472], [1237, 460], [1203.5, 459.5], [1203.5, 440.5], [1183, 440.5]],
-        'E117': [[1182.5, 361], [1231, 360.5], [1231, 342], [1257, 342.5], [1256.5, 384.5], [1183, 384]],
+        'E115': [[1183, 407], [1256, 407], [1256, 427.5], [1183, 427.5]],
+        'E116': [[1183, 384], [1256, 384], [1256, 407], [1183, 407]],
+        'E117': [[1183, 360], [1230.5, 360], [1230, 341.5], [1256, 341.5], [1256.5, 384.5], [1183, 384]],
+        'E118': [[1235, 292], [1256, 292], [1256, 339.5], [1234.5, 339.5], [1230, 339.5], [1229.5, 330], [1235, 330]],
+        'E119': [[1203, 292], [1234, 292], [1234, 328], [1203, 328]],
+        'E120': [[1176, 292], [1203, 292], [1203, 328], [1176, 328]],
+        'E121': [[1144.5, 292.5], [1176, 292.5], [1176, 328], [1144.5, 328]],
+        'E122': [[1113, 292.5], [1143, 292.5], [1143, 328], [1113, 328]],
+        'E123': [[1090, 292.5], [1111.5, 292.5], [1111.5, 330], [1120.5, 330], [1120, 340.5], [1108, 340.5], [1090, 340.5]],
         'E124': [[1090.5, 342.5], [1163.5, 342.5], [1164.5, 363], [1091, 363]],
         'E125': [[1091, 363], [1090.5, 384.5], [1164.5, 384.5], [1164.5, 363]],
         'E126': [[1090.5, 384.5], [1090.5, 406], [1164, 406], [1164.5, 384.5]],
-        'E127': [[1090.5, 406], [1090.5, 428], [1164, 428], [1164, 406]]
+        'E127': [[1090.5, 406], [1090.5, 428], [1164, 428], [1164, 406]],
+        'E128': [[1090.5, 428], [1163.5, 428], [1163.5, 449.5], [1090.5, 449.5]],
+        'E129': [[1090, 451], [1163.5, 451], [1163.5, 471], [1090, 471]],
+        'E130': [[1090, 472.5], [1163.5, 472.5], [1163.5, 493], [1090, 493]],
+        'E131': [[1090, 493], [1163.5, 493], [1163.5, 515], [1090, 515]],
+        'E132': [[1090, 515], [1163.5, 515], [1163.5, 525.5], [1143.5, 525.5], [1143.5, 537], [1090, 537], [1090, 522]],
+        'E133': [[1090.5, 538.5], [1144, 538.5], [1144, 548.5], [1164, 548.5], [1164, 558.5], [1144, 558.5], [1090.5, 558.5]],
+        'E134': [[1090.5, 560], [1164, 560], [1164, 580], [1090.5, 580]],
+        'E135': [[1090.5, 581.5], [1164, 581.5], [1164, 602], [1105, 602.5], [1101.5, 602], [1099.5, 601.5], [1096.5, 600], [1095, 598.5], [1093, 596], [1091.5, 593], [1090.5, 590], [1090.5, 587]],
+        /* Building E · 2nd floor */
+        'E211': [[1318, 590.5], [1394, 590], [1394, 597], [1394, 600.5], [1392, 604.5], [1390.5, 607.5], [1385.5, 611], [1378.5, 611.5], [1318, 611.5]],
+        'E212': [[1318.5, 568.5], [1394, 568], [1394, 590], [1318.5, 589]],
+        'E213': [[1318, 557], [1338.5, 557], [1338.5, 543], [1372.5, 543], [1372.5, 524.5], [1394, 524.5], [1394, 568], [1318, 567]],
+        'E214': [[1318, 437.5], [1394, 437.5], [1394, 480.5], [1372.5, 480.5], [1372, 467.5], [1338.5, 468], [1338.5, 448.5], [1318, 448.5]],
+        'E215': [[1318, 415.5], [1394, 415.5], [1394, 437.5], [1318, 437.5]],
+        'E216': [[1317.5, 394], [1394, 394], [1394, 415.5], [1318, 415.5]],
+        'E217': [[1318, 369], [1365, 369], [1365, 350], [1394, 350.5], [1394, 394], [1317.5, 394]],
+        'E218': [[1369.5, 303.5], [1394, 303.5], [1394, 349.5], [1365, 349.5], [1365, 338.5], [1370, 338.5]],
+        'E219': [[1338, 303.5], [1369, 303.5], [1369, 337], [1338, 337]],
+        'E220': [[1311, 303.5], [1338, 303.5], [1338, 337], [1311, 337]],
+        'E221': [[1279.5, 303], [1309.5, 303], [1309.5, 337], [1279.5, 337]],
+        'E222': [[1248.5, 303.5], [1278.5, 303.5], [1278, 337], [1248.5, 337]],
+        'E223': [[1247.5, 303.5], [1228, 303.5], [1228, 349.5], [1256, 349.5], [1256, 338], [1247.5, 338]],
+        'E224': [[1228, 350.5], [1298.5, 350.5], [1298.5, 371], [1228, 371]],
+        'E225': [[1228, 372], [1298.5, 372], [1298.5, 392.5], [1228, 393]],
+        'E226': [[1228, 394], [1298.5, 394], [1298.5, 414.5], [1228, 414.5]],
+        'E227': [[1228, 416], [1298.5, 416], [1298.5, 436.5], [1228, 436.5]],
+        'E228': [[1228, 437.5], [1298.5, 437.5], [1298.5, 458], [1228, 458]],
+        'E229': [[1228, 459.5], [1298.5, 459.5], [1298.5, 480], [1228, 480]],
+        'E230': [[1228, 481.5], [1298.5, 481.5], [1298.5, 502], [1228, 502]],
+        'E232': [[1298.5, 525], [1298.5, 534], [1279, 534], [1279, 545.5], [1228, 545.5], [1228, 525]],
+        'E233': [[1228, 546.5], [1279, 547], [1279, 556.5], [1299, 556.5], [1299, 567.5], [1228, 567.5]],
+        'E234': [[1228, 568.5], [1298.5, 568.5], [1298.5, 589], [1228, 589]],
+        'E235': [[1228, 590.5], [1298.5, 590.5], [1298.5, 611.5], [1241.5, 611.5], [1238, 611], [1234, 609], [1231, 606], [1229, 601.5]]
       },
 
       /* --- Inventory: Main Marks' OWN sheet (build 68) -------------------

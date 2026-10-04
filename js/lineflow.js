@@ -624,6 +624,9 @@
         });
         holder.appendChild(more);
       }
+      /* a unit on hold has its own colour on the drawing (build 99); the line under it says which and why */
+      var heldU = (rows || []).filter(function (u) { return !u.sellable && units && units.querySelector('.q-u.is-held[data-code="' + u.code + '"]'); });
+      if (heldU.length) holder.appendChild(el('p', 'q-plate-key', heldU.map(function (u) { return u.code + ' · ' + (MM.tx ? MM.tx.status(u.status) : u.status); }).join(' , ')));
       holder.appendChild(el('p', 'q-plate-src', t('Drawing: {src}', { src: f.source || p.name }) + (sharp ? ' · ' + t('sharpened copy') : '')));
 
       var shown = false;
