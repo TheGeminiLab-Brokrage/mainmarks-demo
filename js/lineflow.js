@@ -124,7 +124,7 @@
     /* ---- the sync bar (Qomor #sync) ------------------------------------ */
     var sync = el('div', 'q-sync');
     var dot = el('span', 'q-dot');
-    var syncText = el('span', 'q-synctext', t('Reading the inventory…'));
+    var syncText = el('span', 'q-synctext', t('Loading units…'));
     var refresh = el('button', 'q-ghost q-tiny', t('Refresh'));
     refresh.type = 'button';
     var counts = el('span', 'q-counts');
@@ -141,6 +141,7 @@
     var finder = MM.finder ? MM.finder({
       project: p,
       useWord: useMany(types[0]),
+      filters: l.filters,             /* this product's own questions (build 112) */
       nameOf: function (key) { var b = byKey(key); return b ? b.label : t('Building {b}', { b: key }); }
     }) : null;
     if (finder) wrap.appendChild(finder.node);
@@ -202,11 +203,42 @@
     s4.appendChild(detail);
     s4.hidden = true;
 
-    wrap.appendChild(el('p', 'src q-src', t('Inventory: {inv} · Plans: Main Marks, 29 Sep 2026 · Picture: {pic}',
-      { inv: p.inventory.source || p.inventory.url, pic: p.aerial.source })));
+    /* build 114 (Muhanad): the line naming our inventory file, the plans' date and how the picture was made is
+       off the screen. Those sources stay in config (inventory.source, aerial.source). No on-screen message
+       names the sheet or how the app works. */
 
     /* ---- the aerial's lights and roofs (traced by Muhanad, config) ------ */
     var cfgB = (l.buildings || []).filter(function (b) { return b && b.id; });
+    /* THE ROOFS (build 107): the project's buildings that hold this product (config `buildings`, traced by
+       Muhanad). A roof is a real building; the lists below stay keyed by the sheet's building name, so one
+       roof can stand for two sheet names (D1-D2) and one sheet name for two roofs (B = B1 and B2, told
+       apart by unit number). Without project buildings, the line's own traced roofs are used as before. */
+    var PH = (p.buildings && p.buildings.length)
+      ? p.buildings.filter(function (x) { return x.roof && x.roof.length >= 3 && (l.roofs === 'all' || (x.holds || []).indexOf(l.id) !== -1); })
+      : cfgB.filter(function (b) { return b.roof && b.roof.length >= 3; })
+          .map(function (b) { return { id: b.id, name: b.name, sheet: [b.inventory || b.id], roof: b.roof }; });
+    function unitNo(code) { var m = /(\d{2})\D*$/.exec(String(code)); return m ? +m[1] : -1; }
+    /* a roof answers to the sheet's names for it; one the sheet has no name for yet answers to its own id */
+    function isOf(x, key) { return (x.sheet || []).indexOf(key) !== -1 || (!(x.sheet || []).length && x.id === key); }
+    function physFor(u) {
+      var c = PH.filter(function (x) { return isOf(x, u.building); });
+      if (c.length < 2) return c[0] || null;
+      var n = unitNo(u.code);
+      return c.filter(function (x) { return (x.units || []).some(function (r) { return n >= r[0] && n <= r[1]; }); })[0] || null;
+    }
+    function physOfBuilding(key) {
+      return PH.filter(function (x) { return isOf(x, key); }).map(function (x) { return x.id; });
+    }
+    /* a tap on a roof opens the sheet building under it with the most to sell */
+    var unplaced = false;          /* the sheet does not say which building this line's units are in */
+    function pick(P) {
+      if (unplaced) { if (buildings[0]) selectBuilding(buildings[0].id, true); return; }
+      var c = buildings.map(function (b) {
+        var mine = b.rows.filter(function (u) { return physFor(u) === P; });
+        return { b: b, n: mine.length, a: mine.filter(function (u) { return u.sellable; }).length };
+      }).filter(function (x) { return x.n; }).sort(function (x, y) { return y.a - x.a || y.n - x.n; });
+      if (c[0]) selectBuilding(c[0].b.id, true);
+    }
     var lights = {}, roofs = {}, glows = {};
     function litLayer(box) {
       var im = new Image();
@@ -229,7 +261,7 @@
       var whole = litLayer([0, 0, W, H]);
       whole.classList.remove('is-off');
     }
-    if (!cfgB.some(function (b) { return b.roof && b.roof.length >= 3; })) s1.hint.textContent = t('Choose a building below');
+    if (!PH.length) s1.hint.textContent = t('Choose a building below');
     var NS = 'http://www.w3.org/2000/svg';
     var svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -238,7 +270,7 @@
     svg.innerHTML = '<defs><filter id="lp-glow" x="-15%" y="-15%" width="130%" height="130%">' +
       '<feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>' +
       '<feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
-    cfgB.filter(function (b) { return b.roof && b.roof.length >= 3; }).forEach(function (b) {
+    PH.forEach(function (b) {
       var pts = b.roof.map(function (q) { return q[0] + ',' + q[1]; }).join(' ');
       var glow = document.createElementNS(NS, 'polygon');
       glow.setAttribute('points', pts);
@@ -252,8 +284,8 @@
       g.setAttribute('tabindex', '0');
       g.setAttribute('role', 'button');
       g.setAttribute('aria-label', bLabel(b.name));
-      g.addEventListener('click', function () { selectBuilding(b.id, true); });
-      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectBuilding(b.id, true); } });
+      g.addEventListener('click', function () { pick(b); });
+      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(b); } });
       svg.appendChild(g);
       roofs[b.id] = g;
     });
@@ -266,7 +298,7 @@
        it rides any resize — on a phone a roof is ~45 px wide, and a badge
        on its centre hid the very roof it was lighting (build 69). */
     var badges = {};
-    cfgB.filter(function (b) { return roofs[b.id]; }).forEach(function (b) {
+    PH.forEach(function (b) {
       var sx = 0, top = Infinity;
       b.roof.forEach(function (q) { sx += q[0]; top = Math.min(top, q[1]); });
       var bd = el('button', 'q-badge');
@@ -274,7 +306,7 @@
       bd.hidden = true;
       bd.style.left = (sx / b.roof.length / W * 100).toFixed(2) + '%';
       bd.style.top = (top / H * 100).toFixed(2) + '%';
-      bd.addEventListener('click', function () { selectBuilding(b.id, true); });
+      bd.addEventListener('click', function () { pick(b); });
       canvas.appendChild(bd);
       badges[b.id] = bd;
     });
@@ -285,6 +317,19 @@
     function build(res) {
       rows = res.all.filter(inLine);
       rows.forEach(function (u) { u.fid = floorId(u.floor); });
+      /* THE STREET-LEVEL SHOPS (build 111): the sheet's Bldg "ST" names no building, so each shop joins the
+         building above it (config `buildings`, `street`, by the start of its code). From here on it is a unit
+         of that building like any other: its roof glows, and the building's floor cards show the street level
+         beside the ground floor. A shop no building claims keeps the sheet's own name (fail closed). */
+      var above = {};
+      rows.forEach(function (u) {
+        if (PH.some(function (x) { return isOf(x, u.building); })) return;
+        var code = String(u.code).toUpperCase();
+        var P = PH.filter(function (x) { return (x.street || []).some(function (s) { return code.indexOf(s) === 0; }); })[0];
+        if (!P) return;
+        u.building = (P.sheet || [])[0] || P.id;
+        above[u.building] = P.name;
+      });
       /* the buildings: the traced ones first, in the picture's order, then
          any building the sheet names that nobody has traced yet */
       var SIDE = { left: 0, right: 1 };
@@ -292,13 +337,31 @@
         .map(function (b) { return { id: b.id, name: b.name, label: bLabel(b.name), key: b.inventory || b.id, traced: !!roofs[b.id] }; });
       rows.forEach(function (u) {
         if (!buildings.some(function (b) { return b.key === u.building; })) {
-          buildings.push({ id: u.building, name: 'Building ' + u.building, label: t('Building {b}', { b: u.building }), key: u.building, traced: false });
+          var nm = above[u.building];
+          buildings.push({ id: u.building, name: nm || 'Building ' + u.building, label: nm ? bLabel(nm) : t('Building {b}', { b: u.building }), key: u.building, traced: false, short: nm ? nm.replace(/^Building /, '') : '' });
         }
       });
       buildings.forEach(function (b) {
         b.rows = rows.filter(function (u) { return u.building === b.key; });
         b.avail = b.rows.filter(function (u) { return u.sellable; }).length;
         b.hold = b.rows.filter(function (u) { return u.status === 'On hold'; }).length;
+      });
+      /* once its shops have joined their buildings, an empty "Street level" is not offered */
+      if (Object.keys(above).length) buildings = buildings.filter(function (b) { return b.rows.length; });
+      /* each roof shows ONLY when the sheet has an available unit of this product there (Muhanad, 2026-10-05,
+         build 108: "what glows is what is available"; the grey outline of build 107 is gone). On hold only =
+         not available. A unit added to the sheet lights its building by itself.
+         UNPLACED (the shops: Bldg "ST" names no building): every roof stands for the whole line, glows while
+         the line has anything available, and a tap opens the line's one list. */
+      var placed = rows.some(function (u) { return physFor(u); });
+      unplaced = !!rows.length && !placed;
+      var lineAvail = rows.filter(function (u) { return u.sellable; }).length;
+      PH.forEach(function (P) {
+        var mine = rows.filter(function (u) { return physFor(u) === P; });
+        var a = unplaced ? lineAvail : mine.filter(function (u) { return u.sellable; }).length, g = roofs[P.id];
+        g.classList.toggle('is-none', !a);
+        if (a) g.setAttribute('tabindex', '0'); else g.removeAttribute('tabindex');
+        g.setAttribute('aria-label', bLabel(P.name) + (unplaced ? '' : ' · ' + t('{n} available', { n: a })));
       });
       var avail = rows.filter(function (u) { return u.sellable; }).length;
       counts.textContent = t('{n} {use} · {a} available', { n: rows.length, use: useMany(types[0]).toLowerCase(), a: avail });
@@ -325,14 +388,15 @@
       if (finder) finder.node.hidden = empty;
       none.hidden = !empty;
       if (empty) s1.hint.textContent = '';
-      none.textContent = empty ? t('There are no {use} in Main Marks’ inventory yet. They appear here the moment they are added to the sheet.',
+      none.textContent = empty ? t('No {use} are available right now. They will appear here as soon as they are released.',
         { use: useMany(types[0]).toLowerCase() }) : '';
     }
     function useWord(type) { return USE[type] || type || ''; }
     /* build 92: the same words in the app's language (js/i18n.js) */
     function useMany(type) { return MM.tx ? MM.tx.useMany(type, useWord(type)) : useWord(type); }
     function useOne(type) { var en = useWord(type).replace(/s$/, ''); return MM.tx ? MM.tx.useOne(type, en) : en; }
-    function bLabel(name) { return MM.tx ? MM.tx.building(name) : name; }
+    /* "Building E" is put into the app's language by its letter; any other name ("Street level") is a phrase */
+    function bLabel(name) { var n = /^Building\s/i.test(String(name)) ? name : t(name); return MM.tx ? MM.tx.building(n) : n; }
     function planName(label) { return MM.tx ? MM.tx.plan(label) : label; }
     function egp(v) { return MM.isArabic && MM.tx ? MM.tx.egp(v) : money(v) + ' EGP'; }
     function byKey(key) { return buildings.filter(function (b) { return b.key === key; })[0]; }
@@ -380,20 +444,24 @@
       svg.classList.toggle('is-searching', on);
       var others = 0;
       var bestRow = search.best ? rows.filter(function (x) { return x.code === search.best; })[0] : null;
+      var curB = buildings.filter(function (x) { return x.id === cur.b; })[0];
+      var curPh = curB ? physOfBuilding(curB.key) : [];
+      PH.forEach(function (P) {
+        var n = on ? rows.filter(function (u) { return physFor(u) === P && search.match(u); }).length : 0;
+        var isBest = !!(bestRow && physFor(bestRow) === P);
+        var shown = n > 0 && (!cur.b || lightAll || curPh.indexOf(P.id) !== -1);
+        roofs[P.id].classList.toggle('is-best', isBest);
+        glows[P.id].classList.toggle('is-best', isBest);
+        roofs[P.id].classList.toggle('is-match', shown);
+        badges[P.id].classList.toggle('is-best', isBest);
+        badges[P.id].hidden = !shown;
+        badges[P.id].textContent = String(n);
+        badges[P.id].setAttribute('aria-label', t('{name}, {n} matching units', { name: bLabel(P.name), n: n }));
+      });
       buildings.forEach(function (b) {
         var n = on ? (search.byBuilding[b.key] || 0) : 0;
-        var isBest = !!(bestRow && bestRow.building === b.key);
-        if (roofs[b.id]) roofs[b.id].classList.toggle('is-best', isBest);
-        if (glows[b.id]) glows[b.id].classList.toggle('is-best', isBest);
         var shown = n > 0 && (!cur.b || lightAll || b.id === cur.b);
         if (n > 0 && cur.b && b.id !== cur.b) others += n;
-        if (roofs[b.id]) roofs[b.id].classList.toggle('is-match', shown);
-        if (badges[b.id]) {
-          badges[b.id].classList.toggle('is-best', isBest);
-          badges[b.id].hidden = !shown;
-          badges[b.id].textContent = String(n);
-          badges[b.id].setAttribute('aria-label', t('{name}, {n} matching units', { name: b.label, n: n }));
-        }
         if (lights[b.id]) lights[b.id].classList.toggle('is-off', !(b.id === cur.b || (on && shown)));
       });
       relight.hidden = !(on && cur.b && others && !lightAll);
@@ -409,20 +477,20 @@
 
     function load() {
       dot.className = 'q-dot';
-      syncText.textContent = t('Reading the inventory…');
+      syncText.textContent = t('Loading units…');
       return MM.inventory.load(p.inventory).then(function (res) {
         build(res);
         dot.className = 'q-dot is-live';
         var now = new Date();
         syncText.textContent = '';
-        syncText.appendChild(el('b', null, t('Inventory')));
-        syncText.appendChild(document.createTextNode(' · ' + t('read {time}', {
+        syncText.appendChild(el('b', null, t('Updated')));
+        syncText.appendChild(document.createTextNode(' ' + t('{time}', {
           time: String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') })));
         if (cur.b) selectBuilding(cur.b, false, true);
       }).catch(function (err) {
         /* fail closed: nothing is offered from a sheet we could not read */
         dot.className = 'q-dot is-bad';
-        syncText.textContent = t('The inventory could not be read.');
+        syncText.textContent = t('Units could not be loaded. Please try again.');
         warn.hidden = false;
         warn.textContent = String(err && err.message || err);
         s2.hidden = s3.hidden = s4.hidden = true;
@@ -442,11 +510,12 @@
       cur.b = id;
       if (!keep) { cur.f = null; cur.u = null; }
       sel.value = id;
-      chip.textContent = id;
+      chip.textContent = b.short || id;
       chip.classList.add('is-on');
       bmeta.textContent = b.hold ? t('{n} on hold', { n: b.hold }) : '';
-      Object.keys(roofs).forEach(function (k) { roofs[k].classList.toggle('is-on', k === id); });
-      Object.keys(glows).forEach(function (k) { glows[k].classList.toggle('is-on', k === id); });
+      var onPh = physOfBuilding(b.key);
+      Object.keys(roofs).forEach(function (k) { roofs[k].classList.toggle('is-on', onPh.indexOf(k) !== -1); });
+      Object.keys(glows).forEach(function (k) { glows[k].classList.toggle('is-on', onPh.indexOf(k) !== -1); });
       svg.classList.remove('is-idle');
       lightAll = false;
       s2.hidden = false;
@@ -464,6 +533,17 @@
     function renderFloors(b) {
       floorsGrid.textContent = '';
       var ids = (l.stepFloors || []).slice();
+      /* Commercial (build 112): the floor cards are the levels THIS building holds shops on in the finished
+         project (config `buildings`): the ground floor in all 14, the street level where shops sit under it
+         (`street`), the first floor where it has showrooms (`showrooms`). */
+      if (l.floorsByBuilding) {
+        ids = [];
+        PH.filter(function (x) { return isOf(x, b.key); }).forEach(function (P) {
+          [(P.street || []).length ? 'street' : '', 'ground', P.showrooms ? 'first' : ''].forEach(function (f) {
+            if (f && ids.indexOf(f) === -1) ids.push(f);
+          });
+        });
+      }
       b.rows.forEach(function (u) { if (ids.indexOf(u.fid) === -1) ids.push(u.fid); });
       ids.sort(function (a, c) { return ORDER.indexOf(a) - ORDER.indexOf(c); });
       ids.forEach(function (fid) {

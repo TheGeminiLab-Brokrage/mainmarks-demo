@@ -29,7 +29,15 @@
    It OWNS NOTHING. It reads the rows the line page already loaded, and
    every tap ends in the page's own select path.
 
-   Every chip is derived from the rows, never typed in here.
+   WHAT IS ASKED comes from the PROJECT, not from today's sheet (build 112,
+   Muhanad: "we are building the whole project ... make sure it adapts to
+   the end version, not what we have today in the inventory"). Each line
+   names its own questions in config (`filters`): its floors, its size
+   bands and its own facets (Commercial: the tenant kind; The Fourth: the
+   terrace; R- Residence: the unit type), all read off the brochures. The
+   sheet only says what can be sold TODAY: an option with nothing available
+   is still shown, dimmed, and cannot be chosen. Prices stay derived from
+   the rows: the sheet is the only place a price exists.
    ------------------------------------------------------------------ */
 (function (root) {
   'use strict';
@@ -92,6 +100,9 @@
   function finder(o) {
     var el = MM.el, t = MM.t;
     var p = o.project;
+    var F = o.filters || {};
+    var facets = F.facets || [];
+    var BANDS = F.sizes || SIZE_BANDS;
     var every = (p.terms && p.terms.instalmentEvery) || 3;
     var nameOf = o.nameOf || function (k) { return t('Building {b}', { b: k }); };
     /* build 92: the sheet's floor words in the app's language */
@@ -142,9 +153,9 @@
     body.appendChild(shared);
     var result = el('div', 'fd-result');
     body.appendChild(result);
-    paneUnit.appendChild(el('p', 'fd-wait', t('Reading the inventory…')));
+    paneUnit.appendChild(el('p', 'fd-wait', t('Loading units…')));
 
-    var S = { sizes: [], floors: [], max: null, hold: false, cash: null, quarter: null };
+    var S = { sizes: [], floors: [], facets: {}, max: null, hold: false, cash: null, quarter: null };
     var units = [], listeners = [], chips = [];
     var pickBuilding = null, showUnit = null, showAll = false, sendOptions = null;
     var has = function (a, v) { return a.indexOf(v) >= 0; };
@@ -203,7 +214,8 @@
     /* "Active" = the salesperson asked for something. Available-only is
        the default, not a question, so on its own it lights nothing. */
     function active() {
-      return !!(S.sizes.length || S.floors.length || S.max || S.hold || budgetOn());
+      return !!(S.sizes.length || S.floors.length || S.max || S.hold || budgetOn() ||
+        facets.some(function (f) { return chosen(f).length; }));
     }
 
     /* Available is the sellable test itself, so a status the app does not
@@ -214,11 +226,51 @@
       if (!S.sizes.length) return true;
       return S.sizes.some(function (k) {
         if (k.charAt(0) === 'a') return u.area === +k.slice(1);
-        var b = SIZE_BANDS.filter(function (x) { return x.id === k; })[0];
+        var b = BANDS.filter(function (x) { return x.id === k; })[0];
         return b && u.area > b.lo && u.area <= b.hi;
       });
     }
     function floorOk(u) { return !S.floors.length || has(S.floors, u.fid); }
+
+    /* ---- A FACET: a question only this product has (config `filters.facets`).
+       Which option a unit is, in this order: what the SHEET says (the facet's
+       `column`, matched on each option's `words`; `positive` for a number such
+       as a terrace area), then the project's own `rules` read off the brochure
+       (by unit code or floor), then `otherwise`. A unit nothing places answers
+       no option (fail closed): it stays in the lists and matches no chip. ---- */
+    var facetCache = {};
+    function chosen(f) { return S.facets[f.id] || (S.facets[f.id] = []); }
+    function norm(s) { return String(s == null ? '' : s).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+    function facetOf(u, f) {
+      var k = f.id + '|' + u.code;
+      if (k in facetCache) return facetCache[k];
+      var v = null;
+      var said = f.column ? String(u[f.column] == null ? '' : u[f.column]).trim().toLowerCase() : '';
+      if (said && f.positive) { if (MM.inventory.num(said) > 0) v = f.positive; }
+      else if (said) {
+        f.options.forEach(function (op) {
+          if (v === null && (op.words || [op.label]).some(function (w) { return said.indexOf(String(w).toLowerCase()) !== -1; })) v = op.id;
+        });
+      }
+      if (v === null) {
+        var code = norm(u.code);
+        (f.rules || []).some(function (r) {
+          if (r.floors && r.floors.indexOf(u.fid) === -1) return false;
+          if (r.codes && r.codes.map(norm).indexOf(code) === -1) return false;
+          if (r.starts && !r.starts.some(function (s) { return code.indexOf(norm(s)) === 0; })) return false;
+          v = r.is;
+          return true;
+        });
+      }
+      if (v === null && f.otherwise) v = f.otherwise;
+      return (facetCache[k] = v);
+    }
+    function facetOk(u, skip) {
+      return facets.every(function (f) {
+        var c = chosen(f);
+        return skip === 'facet:' + f.id || !c.length || has(c, facetOf(u, f));
+      });
+    }
     function priceOk(u) { return !S.max || u.listPrice <= S.max; }
 
     /* everything but one test, so that test's chips can be offered from it */
@@ -227,6 +279,7 @@
       if (skip !== 'size' && !sizeOk(u)) return false;
       if (skip !== 'floor' && !floorOk(u)) return false;
       if (skip !== 'price' && !priceOk(u)) return false;
+      if (!facetOk(u, skip)) return false;
       if (skip !== 'budget' && budgetOn() && !fitting(u).length) return false;
       return true;
     }
@@ -321,10 +374,15 @@
       parent.appendChild(r);
       return { row: r, wrap: wrap };
     }
-    function chip(text, isOn, onTap) {
+    /* `isEmpty`: the project has this option but nothing of it can be sold today:
+       shown, dimmed, not a button (build 112) */
+    function chip(text, isOn, onTap, isEmpty) {
       var b = el('button', 'fd-chip', text);
       b.type = 'button';
-      b.__sync = function () { b.setAttribute('aria-pressed', String(!!isOn())); };
+      b.__sync = function () {
+        b.setAttribute('aria-pressed', String(!!isOn()));
+        if (isEmpty) b.disabled = !isOn() && !!isEmpty();
+      };
       b.addEventListener('click', function () { onTap(); showAll = false; optsAll = false; changed(); });
       b.__sync();
       chips.push(b);
@@ -389,7 +447,8 @@
       menu.appendChild(list);
       list.appendChild(chip(t('Any floor'), function () { return !S.floors.length; }, function () { S.floors = []; }));
       floorList.forEach(function (f) {
-        list.appendChild(chip(fl(f), function () { return has(S.floors, f); }, function () { flip(S.floors, f); }));
+        list.appendChild(chip(fl(f), function () { return has(S.floors, f); }, function () { flip(S.floors, f); },
+          function () { return !units.some(function (u) { return u.fid === f && rest(u, 'floor'); }); }));
       });
       var done = el('button', 'fd-more', t('Done'));
       done.type = 'button';
@@ -434,11 +493,17 @@
       paneUnit.textContent = '';
       paneBudget.textContent = '';
       shared.textContent = '';
-      floorList = [];
+      floorList = (F.floors || []).slice();          /* the product's floors, then any other the sheet names */
       units.forEach(function (u) { if (!has(floorList, u.fid)) floorList.push(u.fid); });
       floorList.sort(function (a, b) { return ORDER.indexOf(a) - ORDER.indexOf(b); });
 
       /* -- by unit -- */
+      facets.forEach(function (f) {
+        row(paneUnit, t(f.label), f.options.map(function (op) {
+          return chip(t(op.label), function () { return has(chosen(f), op.id); }, function () { flip(chosen(f), op.id); },
+            function () { return !units.some(function (u) { return facetOf(u, f) === op.id && rest(u, 'facet:' + f.id); }); });
+        }));
+      });
       sizeRow = row(paneUnit, t('Size'), []);          /* filled on every change, from what is left */
       priceRow = row(paneUnit, t('Price up to'), []);
       var fp = floorPicker();
@@ -464,20 +529,33 @@
       units.forEach(function (u) { if (rest(u, 'size') && !has(areas, u.area)) areas.push(u.area); });
       areas.sort(function (a, b) { return a - b; });
       var narrowed = S.floors.length || S.max || budgetOn();
-      var offer = (narrowed && areas.length && areas.length <= EXACT_UP_TO)
+      /* the product's own bands (config) are ALWAYS all on show; one with nothing in it is dimmed */
+      var fixed = !!F.sizes;
+      var live = function (b) { return areas.some(function (a) { return a > b.lo && a <= b.hi; }); };
+      var offer = fixed ? BANDS.map(function (b) { return { k: b.id, label: t(b.label), none: !live(b) }; })
+        : (narrowed && areas.length && areas.length <= EXACT_UP_TO)
         ? areas.map(function (a) { return { k: 'a' + a, label: t('{a} m²', { a: money(a) }) }; })
         : SIZE_BANDS.filter(function (b) { return areas.some(function (a) { return a > b.lo && a <= b.hi; }); })
             .map(function (b) { return { k: b.id, label: t(b.label) }; });
-      var keys = offer.map(function (x) { return x.k; });
+      var keys = offer.filter(function (x) { return !x.none; }).map(function (x) { return x.k; });
       S.sizes = S.sizes.filter(function (k) { return has(keys, k); });
       chips = chips.filter(function (c) { return !c.__size; });
       sizeRow.wrap.textContent = '';
       offer.forEach(function (x) {
-        var c = chip(x.label, function () { return has(S.sizes, x.k); }, function () { flip(S.sizes, x.k); });
+        var c = chip(x.label, function () { return has(S.sizes, x.k); }, function () { flip(S.sizes, x.k); },
+          function () { return !!x.none; });
         c.__size = true;
         sizeRow.wrap.appendChild(c);
       });
       if (!offer.length) sizeRow.wrap.appendChild(el('span', 'fd-none', t('No sizes left for this search')));
+    }
+    /* a chosen facet option that no longer holds a unit is dropped, like a size */
+    function pruneFacets() {
+      facets.forEach(function (f) {
+        S.facets[f.id] = chosen(f).filter(function (id) {
+          return units.some(function (u) { return facetOf(u, f) === id && rest(u, 'facet:' + f.id); });
+        });
+      });
     }
     /* A ceiling below the cheapest unit left matches nothing, and one at
        or above the dearest matches everything: neither is offered. But a
@@ -506,11 +584,15 @@
     }
     function sizeWord(k) {
       if (k.charAt(0) === 'a') return t('{a} m²', { a: money(+k.slice(1)) });
-      var b = SIZE_BANDS.filter(function (x) { return x.id === k; })[0];
+      var b = BANDS.filter(function (x) { return x.id === k; })[0];
       return b ? t(b.label) : k;
     }
     function describe() {
       var bits = [o.useWord || ''];
+      facets.forEach(function (f) {
+        var c = f.options.filter(function (op) { return has(chosen(f), op.id); }).map(function (op) { return t(op.label); });
+        if (c.length) bits.push(c.join(t(' or ')));
+      });
       if (S.sizes.length) bits.push(S.sizes.map(sizeWord).join(t(' or ')));
       if (S.floors.length) bits.push(floorWords());
       if (S.max) bits.push(t('up to {v}', { v: millions(S.max) }));
@@ -687,6 +769,7 @@
 
     function changed(typingKey, keepPin) {
       if (!keepPin) pinned = null;               /* any new question drops a pinned unit */
+      pruneFacets();
       renderSizes();
       renderPrices();
       chips.forEach(function (c) { c.__sync(); });
@@ -801,7 +884,7 @@
     }
     toggle.addEventListener('click', function () { setOpen(body.hidden); });
     clear.addEventListener('click', function () {
-      S.sizes = []; S.floors = []; S.max = null; S.hold = false; S.cash = null; S.quarter = null;
+      S.sizes = []; S.floors = []; S.facets = {}; S.max = null; S.hold = false; S.cash = null; S.quarter = null;
       boxes.forEach(function (b) { b.input.value = ''; });
       showAll = false;
       changed();
@@ -812,9 +895,10 @@
       setUnits: function (list) {
         units = list || [];
         fitCache = {};
+        facetCache = {};
         if (!units.length) {
           paneUnit.textContent = '';
-          paneUnit.appendChild(el('p', 'fd-wait', t('No inventory could be read, so there is nothing to search.')));
+          paneUnit.appendChild(el('p', 'fd-wait', t('Units could not be loaded, so there is nothing to search.')));
           return;
         }
         build();

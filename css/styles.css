@@ -2653,6 +2653,9 @@ body.is-ready .mv-hint { opacity: 1; }
 .lp-roof.is-on { fill: rgba(137, 207, 240, .42); stroke: #fff; stroke-width: 2.5; stroke-opacity: 1; }
 .lp-roof-glow { fill: none; stroke: #fff; stroke-width: 5; opacity: 0; pointer-events: none; transition: opacity .3s ease; }
 .lp-roof-glow.is-on { opacity: 1; }
+/* BUILD 108: only a building with something AVAILABLE is outlined. One with nothing to sell today is not
+   drawn at all (unless it is the one open, reached from the list). */
+.lp-roofs .lp-roof.is-none:not(.is-on) { display: none; }
 /* before any pick, the roofs breathe baby blue: this is where to tap */
 .lp-roofs.is-idle .lp-roof { animation: lp-breathe 2.4s ease-in-out infinite; stroke-opacity: 1; }
 @keyframes lp-breathe {
@@ -2914,6 +2917,9 @@ body.is-ready .mv-hint { opacity: 1; }
 .fd-chip:hover { border-color: var(--q-edge-hi); }
 .fd-chip:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 .fd-chip[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: #000; font-weight: 700; }
+/* in the project, nothing of it on sale today (build 112) */
+.fd-chip:disabled { opacity: .34; border-style: dashed; cursor: default; }
+.fd-chip:disabled:hover { border-color: var(--q-edge); }
 .fd-chev-sm { width: 6px; height: 6px; margin-top: -3px; }
 .fd-floor-btn.is-open .fd-chev-sm { transform: translateY(2px) rotate(-135deg); }
 .fd-floor-menu { display: grid; gap: 10px; justify-items: start; padding: 12px;

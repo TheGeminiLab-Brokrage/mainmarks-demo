@@ -1045,6 +1045,7 @@
       .then(function () { return until(t, function () { return appAt('p=moray') && visible(q('a[href*="line=wellness"]')); }, 20000, 'Moray'); })
       .then(function () { return wait(t, 3200); })
       /* swipe, card by card: each line lights its own buildings on the aerial */
+      .then(function () { return swipeTo(t, 'admin'); })      /* build 103: the row now opens on Commercial, the ground floor */
       .then(function () { return swipeTo(t, 'fourth'); })
       .then(function () { return swipeTo(t, 'wellness'); })
       .then(function () { return tap(t, q('a[href*="line=wellness"]')); })

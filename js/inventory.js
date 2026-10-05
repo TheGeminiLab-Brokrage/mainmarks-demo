@@ -118,6 +118,8 @@
     discount:   ['discount'],
     finalPrice: ['final price', 'net price'],
     view:       ['view'],
+    bedrooms:   ['bedrooms'],
+    terrace:    ['terrace', 'terrace/storage'],
     status:     ['status', 'availability']
   };
 
@@ -219,6 +221,8 @@
           discount: disc,
           finalPrice: fin,
           view: get('view'),
+          bedrooms: get('bedrooms'),
+          terrace: get('terrace'),
           status: st.label,
           sellable: st.ok
         };

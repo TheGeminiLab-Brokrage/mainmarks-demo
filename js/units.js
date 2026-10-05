@@ -45,7 +45,7 @@
       node.appendChild(warn);
     }
 
-    var state = el('p', 'units-state', t('Reading the inventory…'));
+    var state = el('p', 'units-state', t('Loading units…'));
     node.appendChild(state);
 
     var body = el('div', 'units');
@@ -69,7 +69,7 @@
 
     /* ---- load ---------------------------------------------------------- */
     if (!p.inventory || !p.inventory.url) {
-      state.textContent = t('Units open here as soon as the availability sheet arrives.');
+      state.textContent = t('Units will appear here as soon as they are released.');
       return api();
     }
 
@@ -92,7 +92,7 @@
     }).catch(function (e) {
       /* A refusal the salesperson can see beats a list that is quietly
          wrong. Never fall back to a cached or partial book. */
-      state.textContent = t('The inventory could not be read. ') + e.message;
+      state.textContent = t('Units could not be loaded. Please try again.');
       state.classList.add('is-bad');
     });
 

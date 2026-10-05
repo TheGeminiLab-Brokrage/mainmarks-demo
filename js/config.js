@@ -14,7 +14,7 @@ const CONFIG = {
   /* Bumped on every deploy, and matched by the ?v= on every script tag in
      the HTML. That pair is what stops a returning phone running yesterday's
      JavaScript. See README, "Deploying". */
-  build: 99,
+  build: 114,
 
   /* Where the activity log is sent. Empty = kept on the device only, which
      is where it is today. Filling this in is the whole change when the
@@ -387,8 +387,8 @@ const CONFIG = {
                       wordmark, with the slash — on Moray's ink ground.
                       Replace it with their logo file when it arrives.
 
-         Commercial is NOT released (Main Marks, 2026-09-29), so it has no
-         card. Adding it is one entry here with `released: true`.
+         Commercial was held back on 2026-09-29 and RELEASED on 2026-10-05
+         (build 100): Main Marks' sheet sells ten street-level units.
 
          `accent` colours the way-in line and the ring on the card. It is
          each line's own accent, from its own CI, never borrowed.
@@ -397,6 +397,84 @@ const CONFIG = {
          Moray's brochure (Oct 2025), which predates The Fourth (Sep 2026)
          — whether it includes the fourth floor is not stated. */
       lines: [
+        /* THE ORDER OF THE CARDS (Muhanad, 2026-10-05, "the design point of view"): from the ground up.
+           Swiping lights the complex in the order it is built: the ground floor everywhere (Commercial),
+           the middle floors (Offices), the top floor (The Fourth), then the two clinic buildings and the
+           back row. It is also the brochure's order. Sales would put Offices first (most units); he chose
+           the story. demo.html swipes the cards in this order. */
+        { id: 'commercial', released: true,
+          name:   'Commercial units',
+          badge:  'Shops',
+          ground: '#323031', ink: '#FFFFFF', accent: '#FA6126',   /* Moray's own ground and primary orange: commercial has no brand of its own, so it wears Moray, as the offices do */
+          mark:   { kind: 'moray-heading', logo: 'img/moray-logo.svg', heading: 'Commercial units' },
+          img:    'img/moray-line-commercial.jpg', imgSource: 'Moray brochure, PDF p.29',
+          line:   'A lively, walkable hub of shops, cafés and dining.',   lineSource: 'Moray brochure, PDF p.28',
+          facts:  [ { k: 'Unit sizes', v: '43 – 2,444 m²' }, { k: 'Where', v: 'Street level and ground floor' } ],
+          factsSource: 'Moray brochure, PDF p.18, 19, 28',
+          lit:    'img/moray-aerial-lit-commercial.webp', /* the ground floor of every building where the camera sees it, the roof gardens of all 14, and the two building signs (build 106) */
+          floors: ['street', 'ground'],          /* Retail, Bank, Pharmacy / F&B, Retail, Showroom, Pharmacy in their legends, PDF p.18-19 */
+
+          /* --- the line page: the same flow + Find a unit as every line (build 100).
+             RELEASED 2026-10-05 on Muhanad's word, because Main Marks' own sheet sells it:
+             10 rows, Type "Commercial", Bldg "ST", Floor "S.Level". All 10 codes and sizes
+             were read against the brochure's street-level plan (PDF p.18) and agree
+             (the sheet writes "ST03E-2" where the plan prints "ST03 (E2)").
+             WHERE THEY ARE: the sheet's building is "ST" = the street level, not a block.
+             It is shown under that name. A ground-floor shop added with Bldg "A" shows as
+             Building A by itself. Nothing is traced: no roofs, no cuts, so units are picked
+             from the list and the line's lit picture stays on.
+             PLANS: the four standing plans only. The offer never applies to Commercial
+             (Yostina, 29 Sep 2026); the plans carry that rule (`notFor`). */
+          layout: 'plan',
+          match:  { type: ['Commercial'] },
+          /* FIND A UNIT, FOR THIS PRODUCT (build 112). Laid out from the finished project, not from today's sheet:
+             the brochure's three shop levels (street PDF p.18, ground p.19, first-floor showrooms p.20), its five
+             tenant kinds (the plans' own legends) and its size range (43 to 2,444 m2, p.28).
+             WHICH KIND A SHOP IS: a "Use" column in the sheet wins; without one, the street level is read off the
+             p.18 colours (bank ST03D, ST09, ST10, ST14; pharmacy ST04A; every other ST shop retail) and every
+             first-floor shop is a showroom (p.20 has no other commercial colour). THE GROUND FLOOR (about 200
+             shops: F&B, retail, showroom, pharmacy) IS NOT TABLED YET: until Main Marks' sheet carries the kind,
+             a ground-floor shop is listed but answers no Tenant chip. */
+          filters: {
+            floors: ['street', 'ground', 'first'],
+            sizes: [
+              { id: 'c100', label: 'Up to 100 m²', lo: 0, hi: 100 },
+              { id: 'c200', label: '101–200 m²', lo: 100, hi: 200 },
+              { id: 'c500', label: '201–500 m²', lo: 200, hi: 500 },
+              { id: 'c1000', label: '501–1,000 m²', lo: 500, hi: 1000 },
+              { id: 'cmax', label: 'Over 1,000 m²', lo: 1000, hi: Infinity }
+            ],
+            facets: [
+              { id: 'use', label: 'Tenant', column: 'kind',
+                options: [
+                  { id: 'retail',   label: 'Retail',   words: ['retail', 'shop'] },
+                  { id: 'fnb',      label: 'F&B',      words: ['f&b', 'f & b', 'food', 'restaurant', 'cafe', 'café'] },
+                  { id: 'showroom', label: 'Showroom', words: ['showroom', 'show room'] },
+                  { id: 'pharmacy', label: 'Pharmacy', words: ['pharmacy'] },
+                  { id: 'bank',     label: 'Bank',     words: ['bank'] }
+                ],
+                rules: [
+                  { is: 'bank',     floors: ['street'], codes: ['ST03D', 'ST09', 'ST10', 'ST14'] },
+                  { is: 'pharmacy', floors: ['street'], codes: ['ST04A'] },
+                  { is: 'retail',   floors: ['street'], starts: ['ST'] },
+                  { is: 'showroom', floors: ['first'] }
+                ] }
+            ]
+          },
+          floorsByBuilding: true,
+          roofs:  'all',                          /* in the buildings (ground floor and up): any of the 14 may hold shops */
+          stepFloors: ['street', 'ground'],       /* build 111: every building shows both cards; the ground floor says "none available" until its shops are in the sheet */
+          buildings: [ { id: 'ST', name: 'Street level', inventory: 'ST' } ],
+          place:  'North 90th Street, New Cairo',
+          /* Tapping the card builds the mark it wears, as Offices does: MORAY rises, then
+             the slash and the brochure's own words for this product (PDF p.28). */
+          markBuild: {
+            kind:    'letters',
+            src:     'img/moray-logo.svg',
+            heading: 'Commercial units',
+            source:  'Moray CI PDF p.18 (logo); Moray brochure PDF p.28 ("Moray’s commercial units")'
+          }
+        },
         { id: 'admin', released: true,
           name:   'Administrative units',
           badge:  'Offices',
@@ -417,6 +495,17 @@ const CONFIG = {
              the select; the line's lit picture stays on. */
           layout: 'plan',
           match:  { type: ['Admin'], floors: ['first', 'second', 'third'] },
+          /* FIND A UNIT, FOR THIS PRODUCT (build 112): from the finished project, not today's sheet. Offices on the 1st to 3rd floors, 42 to 1,410 m2, "compact studios to large headquarters" (Moray brochure PDF p.35). */
+          filters: {
+            floors: ['first', 'second', 'third'],
+            sizes: [
+              { id: 'o60', label: 'Up to 60 m²', lo: 0, hi: 60 },
+              { id: 'o100', label: '61–100 m²', lo: 60, hi: 100 },
+              { id: 'o200', label: '101–200 m²', lo: 100, hi: 200 },
+              { id: 'o500', label: '201–500 m²', lo: 200, hi: 500 },
+              { id: 'omax', label: 'Over 500 m²', lo: 500, hi: Infinity }
+            ]
+          },
           stepFloors: ['first', 'second', 'third'],
           place:  'North 90th Street, New Cairo',
           /* Tapping the card builds the mark it wears: MORAY rises letter by
@@ -465,6 +554,23 @@ const CONFIG = {
              Type "Admin" on the Fourth floor (A01, D3, D4 today). */
           layout: 'plan',
           match:  { type: ['Admin'], floors: ['fourth'] },
+          /* FIND A UNIT, FOR THIS PRODUCT (build 112): from the finished project, not today's sheet. 153 offices on the 4th floor, 22 of them with a private terrace (The Fourth brochure PDF p.13-16: the terrace area is printed per unit; those 22 codes are listed here). A "Terrace" figure in the sheet wins over the list. */
+          filters: {
+            floors: ['fourth'],
+            sizes: [
+              { id: 'o60', label: 'Up to 60 m²', lo: 0, hi: 60 },
+              { id: 'o100', label: '61–100 m²', lo: 60, hi: 100 },
+              { id: 'o200', label: '101–200 m²', lo: 100, hi: 200 },
+              { id: 'o500', label: '201–500 m²', lo: 200, hi: 500 },
+              { id: 'omax', label: 'Over 500 m²', lo: 500, hi: Infinity }
+            ],
+            facets: [
+              { id: 'terrace', label: 'Terrace', column: 'terrace', positive: 'with', otherwise: 'none',
+                options: [ { id: 'with', label: 'With terrace' }, { id: 'none', label: 'No terrace' } ],
+                rules: [ { is: 'with', codes: ['A401', 'A402', 'A403', 'A404', 'A405', 'B401', 'B402', 'B403', 'B416C', 'B417C',
+                  'D1-401', 'D1-415', 'D1-416', 'D1-417', 'D4-407', 'D4-410', 'E401', 'E449', 'E450', 'E451', 'E452', 'E453'] } ] }
+            ]
+          },
           stepFloors: ['fourth'],
           place:  'North 90th Street, New Cairo',
           /* Tapping the card builds The Fourth's own post, CI p.30
@@ -519,6 +625,17 @@ const CONFIG = {
              Type is Clinic. A clinic added to the sheet — on any floor, in any
              building — joins this page with no change here. */
           match:  { type: ['Clinic'] },
+          /* FIND A UNIT, FOR THIS PRODUCT (build 112): from the finished project, not today's sheet. Clinics on the 1st to 3rd floors of the two clinic buildings, 41 to 203 m2 (Moray brochure PDF p.20-22, p.37). A clinic the sheet puts on another floor brings its own chip. */
+          filters: {
+            floors: ['first', 'second', 'third'],
+            sizes: [
+              { id: 'w60', label: 'Up to 60 m²', lo: 0, hi: 60 },
+              { id: 'w80', label: '61–80 m²', lo: 60, hi: 80 },
+              { id: 'w100', label: '81–100 m²', lo: 80, hi: 100 },
+              { id: 'w150', label: '101–150 m²', lo: 100, hi: 150 },
+              { id: 'wmax', label: 'Over 150 m²', lo: 150, hi: Infinity }
+            ]
+          },
           /* The floors a clinic building has, per Muhanad (2026-10-01): "the
              building contains medical units from the first till the fourth
              floor". Shown even while a floor has nothing on sale, so a unit
@@ -600,6 +717,23 @@ const CONFIG = {
              closed) — confirm the word when the rows arrive. */
           layout: 'plan',
           match:  { type: ['Serviced', 'Serviced Apartment', 'Serviced Apartments', 'Residence', 'R- Residence', 'Hotel Apartment'] },
+          /* FIND A UNIT, FOR THIS PRODUCT (build 112): from the finished project, not today's sheet. Serviced apartments on the 1st to 4th floors of HA-HD, 38 to 83 m2, in three unit types (Moray brochure PDF p.40, p.44-54). The unit type is read from the sheet's Bedrooms column; its wording is not known yet. */
+          filters: {
+            floors: ['first', 'second', 'third', 'fourth'],
+            sizes: [
+              { id: 'r45', label: 'Up to 45 m²', lo: 0, hi: 45 },
+              { id: 'r60', label: '46–60 m²', lo: 45, hi: 60 },
+              { id: 'rmax', label: 'Over 60 m²', lo: 60, hi: Infinity }
+            ],
+            facets: [
+              { id: 'layout', label: 'Unit type', column: 'bedrooms',
+                options: [
+                  { id: 'junior', label: 'Junior studio', words: ['junior'] },
+                  { id: 'studio', label: 'Studio',        words: ['studio', '0'] },
+                  { id: 'one',    label: 'One bedroom',   words: ['one', '1'] }
+                ] }
+            ]
+          },
           stepFloors: [],
           place:  'North 90th Street, New Cairo',
           /* Tapping the card builds the brochure's lockup, PDF p.39: the
@@ -612,7 +746,6 @@ const CONFIG = {
             source: 'Moray CI PDF p.18 (logo); Moray brochure PDF p.39 (lockup)'
           }
         }
-        /* { id: 'commercial', released: false, ... } — not released yet */
       ],
 
       /* The brochure's own plan images, each merged with its own
@@ -627,6 +760,62 @@ const CONFIG = {
         { id: 'second', name: 'Second',       img: 'img/moray-plan-second.webp', legend: ['Admin', 'Clinics'], source: 'Moray brochure, PDF p.21' },
         { id: 'third',  name: 'Third',        img: 'img/moray-plan-third.webp',  legend: ['Admin', 'Clinics'], source: 'Moray brochure, PDF p.22' },
         { id: 'fourth', name: 'Fourth',       img: 'img/moray-plan-fourth.webp', legend: [], source: 'Moray brochure, PDF p.23' }
+      ],
+
+      /* THE 14 BUILDINGS (build 107). Roofs traced by hand by Muhanad on the night aerial (1672 x 941 px) in
+         tools/trace-building-roofs.html, 2026-10-05; `holds` = the products he ticked for each.
+         NAMES: read off The Fourth brochure's labelled master plan (PDF p.13) and its unit tables (p.14-16),
+         the Moray brochure plans (p.19-20: C101-C104, HA-HD) and the sheet. Front row A1 B1 C1 D1-D2 E1,
+         middle row A2 B2 C2 D3-D4 E2, back row HA HB HC HD. "C1"/"C2" are OUR names for the front and back
+         centre blocks: the brochure calls both "C".
+         `sheet` = what the inventory's Bldg column calls it. The sheet's "A" is A2 (clinics) and "A01" is A1;
+         "D1" and "D2" are one block, so are "D3" and "D4"; "E01" is ASSUMED for E1 (no rows yet).
+         The sheet's "B" is TWO blocks: `units` tells them apart by the last two digits of the unit code,
+         from The Fourth's tables (B1 = 01-08 and 27-33, B2 = 10-24), ASSUMED the same on every floor.
+         A unit that fits no building lights no roof (fail closed); it is still in the lists.
+         HOW IT IS USED (js/lineflow.js): on a product page a building is outlined, light blue and tappable,
+         ONLY while the sheet has an AVAILABLE unit of that product there (build 108; the grey "holds it but
+         nothing available" outline of build 107 was dropped at his word). `holds` only limits which roofs a
+         line may light.
+         `street` (build 111) = THE STREET-LEVEL SHOPS UNDER THIS BUILDING, as the start of their unit code.
+         The sheet files every such shop under Bldg "ST", which names no building; Muhanad, 2026-10-05:
+         attach each shop to the building above it, so that roof glows and a tap shows what it carries on
+         the street level and the ground floor. Read by POSITION: the street-level plan (Moray brochure
+         PDF p.18) laid over the ground-floor plan (p.19), which share one outline. ST02B/ST02A and the two
+         STC groups were split the same way. NOT confirmed by Main Marks. A shop that fits no building
+         stays under "Street level" in the list and lights no roof.
+         `showrooms` (build 112) = the building has SHOWROOMS ON ITS FIRST FLOOR: the five front-row blocks, by the
+         green on the brochure's first-floor plan (PDF p.20). With `street` it decides a building's floor cards
+         on the Commercial page (ground floor in all 14). */
+      buildings: [
+        { id: 'A1', name: 'Building A1', sheet: ['A01'], holds: ['commercial', 'admin', 'fourth'], showrooms: true, street: ['ST09', 'ST10', 'ST11', 'ST12', 'ST13', 'ST14'],
+          roof: [[428, 219], [433, 217], [436, 216], [439, 216], [441, 217], [444, 217], [457, 223], [523, 247], [530, 250], [532, 251], [531, 255], [530, 259], [526, 261], [522, 264], [515, 269], [440, 321], [389, 353], [385, 355], [381, 358], [376, 360], [371, 363], [366, 365], [361, 366], [355, 368], [350, 370], [344, 371], [336, 372], [323, 374], [309, 376], [298, 377], [288, 378], [119, 399], [115, 400], [111, 400], [109, 400], [106, 400], [104, 400], [101, 400], [98, 400], [95, 400], [94, 399], [92, 398], [90, 397], [90, 397], [88, 394], [91, 393], [91, 393], [91, 393], [249, 318], [191, 346]] },
+        { id: 'B1', name: 'Building B1', sheet: ['B'], units: [[1, 9], [25, 99]], holds: ['commercial', 'admin', 'fourth'], showrooms: true,
+          roof: [[735, 298], [741, 292], [745, 287], [745, 282], [741, 277], [736, 273], [731, 271], [726, 271], [717, 271], [708, 271], [700, 271], [684, 272], [667, 274], [660, 274], [612, 279], [605, 281], [602, 282], [597, 283], [593, 285], [582, 290], [394, 424], [392, 428], [394, 431], [395, 433], [396, 435], [400, 436], [403, 437], [406, 437], [410, 438], [416, 438], [420, 438], [424, 438], [428, 438], [433, 437], [436, 436], [442, 435], [452, 433], [459, 431], [476, 427], [500, 422], [642, 394], [646, 393], [650, 392], [653, 391], [656, 389]] },
+        { id: 'C1', name: 'Building C1', sheet: [], holds: ['commercial', 'admin'], showrooms: true, street: ['STC01', 'STC02', 'STC03', 'STC04', 'STC05'],
+          roof: [[987, 334], [992, 335], [995, 335], [998, 336], [1001, 336], [1001, 339], [1000, 342], [999, 344], [997, 347], [994, 351], [951, 409], [947, 415], [943, 421], [940, 423], [938, 425], [935, 425], [932, 425], [929, 425], [926, 425], [923, 425], [920, 424], [917, 423], [913, 421], [910, 419], [908, 417], [798, 334], [798, 331], [799, 328], [800, 326], [803, 324], [807, 322], [811, 320], [819, 316], [827, 314], [836, 312], [849, 312]] },
+        { id: 'D1-D2', name: 'Building D1-D2', sheet: ['D1', 'D2'], holds: ['commercial', 'admin', 'fourth'], showrooms: true,
+          roof: [[1092, 533], [1097, 536], [1103, 541], [1107, 542], [1111, 544], [1120, 545], [1129, 545], [1135, 544], [1140, 542], [1144, 539], [1148, 535], [1150, 529], [1225, 367], [1227, 363], [1227, 358], [1223, 356], [1216, 354], [1092, 324], [1087, 324], [1080, 327], [1072, 334], [985, 447], [982, 452], [980, 456], [983, 462]] },
+        { id: 'E1', name: 'Building E1', sheet: ['E01'], holds: ['commercial', 'admin', 'fourth'], showrooms: true,
+          roof: [[1318, 376], [1320, 371], [1324, 368], [1328, 368], [1333, 368], [1343, 368], [1352, 368], [1455, 386], [1460, 387], [1465, 390], [1470, 395], [1473, 400], [1476, 403], [1479, 409], [1637, 608], [1639, 612], [1639, 619], [1635, 623], [1627, 627], [1622, 628], [1613, 628], [1605, 627], [1598, 626], [1590, 623], [1583, 619], [1372, 526], [1366, 522], [1361, 520], [1357, 518], [1350, 512], [1291, 448], [1287, 443], [1287, 439], [1292, 428]] },
+        { id: 'A2', name: 'Building A2', sheet: ['A'], holds: ['wellness'], street: ['ST04', 'ST05', 'ST06', 'ST07', 'ST08'],
+          roof: [[457, 192], [454, 194], [452, 197], [450, 200], [451, 204], [454, 207], [457, 208], [460, 210], [465, 212], [470, 213], [475, 215], [480, 216], [487, 218], [495, 220], [504, 222], [511, 224], [519, 228], [529, 231], [535, 232], [542, 233], [550, 233], [556, 234], [560, 234], [566, 234], [571, 234], [574, 233], [578, 232], [582, 230], [589, 226], [594, 222], [600, 217], [607, 211], [615, 204], [621, 200], [628, 194], [635, 189], [645, 179], [652, 173], [660, 167], [667, 162], [673, 158], [676, 155], [679, 153], [683, 149], [684, 144], [682, 140], [678, 138], [672, 136], [666, 134], [656, 133], [635, 130], [613, 128], [587, 127], [578, 126], [569, 126], [562, 127], [555, 129]] },
+        { id: 'B2', name: 'Building B2', sheet: ['B'], units: [[10, 24]], holds: ['commercial', 'admin', 'fourth'],
+          roof: [[653, 226], [650, 230], [649, 234], [649, 239], [653, 244], [662, 246], [780, 255], [785, 255], [789, 255], [797, 251], [870, 168], [869, 164], [867, 161], [862, 159], [858, 159], [852, 159], [727, 167], [719, 169], [712, 172]] },
+        { id: 'C2', name: 'Building C2', sheet: [], holds: [], street: ['STC06', 'STC07', 'STC08', 'STC09', 'STC10'],
+          roof: [[1029, 217], [1036, 218], [1040, 218], [1046, 219], [1049, 219], [1050, 220], [1051, 222], [1051, 224], [1051, 225], [1050, 227], [1048, 230], [1022, 277], [1020, 279], [1019, 280], [1017, 281], [1015, 282], [1011, 283], [1006, 283], [847, 269], [844, 268], [843, 267], [843, 266], [843, 264], [843, 262], [844, 260], [845, 258], [885, 210], [887, 208], [889, 206], [892, 204], [894, 203]] },
+        { id: 'D3-D4', name: 'Building D3-D4', sheet: ['D3', 'D4'], holds: ['commercial', 'admin', 'fourth'],
+          roof: [[1083, 270], [1080, 273], [1078, 277], [1081, 283], [1083, 285], [1088, 288], [1092, 289], [1203, 310], [1210, 310], [1215, 309], [1219, 306], [1222, 303], [1291, 205], [1293, 200], [1291, 196], [1286, 193], [1160, 183], [1154, 184]] },
+        { id: 'E2', name: 'Building E2', sheet: ['E02'], holds: ['wellness'],
+          roof: [[1336, 326], [1333, 330], [1330, 334], [1327, 337], [1327, 342], [1329, 344], [1332, 347], [1336, 348], [1340, 351], [1345, 353], [1349, 354], [1354, 355], [1361, 356], [1365, 357], [1369, 357], [1376, 359], [1385, 361], [1398, 364], [1411, 367], [1418, 368], [1427, 370], [1437, 372], [1447, 373], [1458, 375], [1468, 377], [1475, 378], [1482, 379], [1488, 380], [1492, 380], [1496, 380], [1500, 379], [1505, 378], [1509, 376], [1513, 374], [1516, 371], [1518, 368], [1519, 364], [1520, 358], [1522, 352], [1523, 347], [1525, 341], [1527, 334], [1529, 326], [1533, 313], [1536, 303], [1541, 283], [1545, 273], [1547, 267], [1549, 255], [1549, 247], [1547, 243], [1543, 239], [1535, 234], [1530, 232], [1522, 230], [1500, 227], [1416, 216], [1411, 215], [1406, 215], [1402, 216], [1398, 218], [1394, 221], [1390, 228], [1382, 245], [1374, 259]] },
+        { id: 'HA', name: 'Building HA', sheet: [], holds: ['residence', 'commercial'], street: ['ST03'],
+          roof: [[700, 120], [704, 120], [707, 120], [710, 120], [713, 120], [717, 120], [720, 118], [722, 116], [723, 114], [724, 112], [744, 74], [744, 71], [745, 69], [743, 66], [741, 64], [630, 50], [626, 50], [623, 51], [621, 53], [619, 56], [581, 103], [579, 104], [579, 107], [582, 110], [585, 110]] },
+        { id: 'HB', name: 'Building HB', sheet: [], holds: ['residence', 'commercial'], street: ['ST02B'],
+          roof: [[781, 113], [780, 117], [779, 120], [777, 123], [777, 125], [778, 126], [780, 128], [784, 128], [787, 128], [791, 128], [794, 129], [799, 129], [991, 145], [994, 145], [996, 144], [998, 142], [999, 141], [1000, 138], [1001, 134], [1010, 90], [1008, 88], [1006, 85], [1002, 83], [802, 70], [799, 70], [796, 70], [794, 72]] },
+        { id: 'HC', name: 'Building HC', sheet: [], holds: ['residence', 'commercial'], street: ['ST02A'],
+          roof: [[1069, 143], [1068, 146], [1067, 149], [1067, 152], [1071, 154], [1075, 155], [1079, 155], [1084, 155], [1322, 175], [1326, 175], [1330, 175], [1332, 174], [1335, 170], [1338, 163], [1346, 119], [1344, 113], [1340, 111], [1334, 110], [1330, 109], [1088, 90], [1083, 91], [1080, 92], [1077, 94]] },
+        { id: 'HD', name: 'Building HD', sheet: [], holds: ['residence', 'commercial'], street: ['ST01'],
+          roof: [[1395, 172], [1394, 177], [1393, 181], [1394, 183], [1397, 187], [1402, 188], [1407, 189], [1521, 203], [1527, 203], [1530, 203], [1533, 202], [1536, 199], [1537, 192], [1537, 187], [1540, 143], [1540, 140], [1539, 139], [1537, 138], [1410, 122], [1407, 122], [1406, 122], [1403, 124]] }
       ],
 
       /* Building cuts on the floor drawings — drawn by hand by Muhanad in tools/cut-buildings.html, 2026-10-01.
