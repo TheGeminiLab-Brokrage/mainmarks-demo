@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en" data-t-title="Main Marks — Manager view">
+<html lang="en" data-view="my" data-t-title="Main Marks — My activity">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Main Marks — Manager view</title>
+<title>Main Marks — My activity</title>
 <meta name="theme-color" content="#0c0907">
 <meta name="robots" content="noindex">
 <link rel="icon" href="img/icon.svg" type="image/svg+xml">
@@ -15,13 +15,15 @@
 </head>
 <body>
 
-<!-- THE SALES MANAGER VIEW, in the look Muhanad chose on 2026-10-06 (Ember).
-     One page, five tabs on a bottom bar. Everything on it is drawn by
-     js/manager.js from the book js/manager-book.js hands it; the brief
-     (Moray App Brief, section 7c) is the specification. -->
+<!-- A SALESPERSON'S "MY ACTIVITY" (build 121), in the same Ember look as the
+     manager view and drawn by the same script: js/manager.js reads
+     data-view="my" on the html tag and narrows the book to the one person
+     signed in. Three tabs on the bar: Quick Offer (the sales app, another
+     page), My activity, Profile. The plus button records an orientation, a
+     workshop, a meeting, a reservation or a contract. -->
 <div class="glow" aria-hidden="true"></div>
 <main class="scr" id="scr"></main>
-<button class="fab" id="fab" type="button" hidden aria-label="Record an orientation, a workshop, a meeting, a reservation, a contract or a cancellation" data-t-aria="Record an orientation, a workshop, a meeting, a reservation, a contract or a cancellation"></button>
+<button class="fab" id="fab" type="button" hidden aria-label="Record an orientation, a workshop, a meeting, a reservation or a contract" data-t-aria="Record an orientation, a workshop, a meeting, a reservation or a contract"></button>
 <nav class="tab" id="tab" aria-label="Sections" data-t-aria="Sections" hidden></nav>
 <div class="veil" id="veil"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Details" data-t-aria="Details"></div>

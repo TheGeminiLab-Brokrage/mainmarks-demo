@@ -100,6 +100,7 @@
       email: found.email || '',
       role: found.role,
       phone: found.phone || '',
+      staff: found.staff || '',
       projects: Array.isArray(found.projects) ? found.projects.slice() : [],
       demo: !!cfg().usersDemo,
       at: new Date().toISOString()
@@ -155,7 +156,24 @@
     return (s.projects || []).indexOf(id) !== -1 && !!MM.sellableProject(id);
   }
 
+  /* WHICH MEMBER OF THE SALES TEAM IS SIGNED IN (build 121): the place of
+     this salesperson in CONFIG.salesTeam.members, found by staff code, or -1.
+     -1 is the answer for a manager, for an account with no staff code, and
+     on a copy published without the team: there the salesperson has no
+     "My activity", and nothing links to it. A session saved before build 121
+     carries no staff code, so the account is looked up by its id. */
+  function member() {
+    var s = current(), team = cfg().salesTeam, staff = '', i;
+    if (!s || s.role !== 'sales' || !team || !Array.isArray(team.members)) return -1;
+    staff = s.staff || '';
+    if (!staff) (cfg().users || []).forEach(function (u) { if (u.id === s.id) staff = u.staff || ''; });
+    if (!staff) return -1;
+    for (i = 0; i < team.members.length; i++) if (team.members[i].code === staff) return i;
+    return -1;
+  }
+
   MM.auth = {
+    member: member,
     current: current,
     signIn: signIn,
     signOut: signOut,

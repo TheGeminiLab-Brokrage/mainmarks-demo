@@ -21,7 +21,9 @@
      d    days ago; t = minute of that day
      p    unit type; ch = 'post' | 'pdf' (how an offer was sent)
      u    unit code; area in m2; v = price in EGP
-     why  a cancellation's reason; of = the reservation it cancels
+     why  a cancellation's reason; of = the reservation it cancels, or, on a
+          contract entered from a reservation, the reservation it closes
+     made on an entry recorded on this phone: the day it was entered
      end  on a reservation: 'contract' | 'cancel' (never deleted, only marked)
    When the real store exists it hands js/manager.js this same object and
    nothing on the page changes.
@@ -72,8 +74,9 @@
     function agoOf(date) { return Math.round((today - new Date(date.getFullYear(), date.getMonth(), date.getDate())) / 864e5); }
 
     /* the units a deal can sit on: available rows only, in a fixed order */
-    var pool = {}, byCode = {};
+    var pool = {}, byCode = {}, free = {};
     inv.all.forEach(function (u) { byCode[String(u.code).toUpperCase()] = u; });
+    inv.units.forEach(function (u) { free[String(u.code).toUpperCase()] = true; });
     inv.units.slice().sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; }).forEach(function (u) {
       var p = productOf(u);
       (pool[p] || (pool[p] = [])).push(u);
@@ -198,27 +201,50 @@
       if (c === -1 || m === -1) return null;
       var e = { id: r.id, mine: true, k: r.k, c: c, m: m, d: d, t: r.t, p: r.p };
       var m2 = codeAt(r.m2);
+      if (r.made) e.made = r.made;                                       /* the day it was entered, which is not always its date */
       if (r.k === 'reservation' || r.k === 'contract') { e.u = r.u; e.area = r.area || null; e.v = r.v; }
       if (r.k !== 'meeting' && m2 !== -1 && m2 !== m) e.m2 = m2;       /* a deal split with, or a visit made with */
+      /* build 121: a contract entered FROM a reservation closes it; the reservation is kept, marked */
+      if (r.k === 'contract' && r.of) {
+        var from = events.filter(function (x) { return x.id === r.of && x.k === 'reservation' && !x.end; })[0];
+        if (from) { from.end = 'contract'; e.of = from.id; }
+      }
       events.push(e); return e;
+    }
+    /* TAKING AN ENTRY BACK (build 121). Only what was entered on this phone, and only on the day it was
+       entered: after that the record stands, and correcting it is the manager's. A reservation that has
+       since been signed or cancelled is not taken back from under what followed it. */
+    function removable(e) { return !!(e && e.mine && e.made === iso(today) && !(e.k === 'reservation' && e.end)); }
+    function remove(id) {
+      var e = events.filter(function (x) { return x.id === id; })[0];
+      if (!removable(e)) return false;
+      if (e.k === 'contract' && e.of) events.forEach(function (x) { if (x.id === e.of) { delete x.end; delete x.endD; } });
+      events.splice(events.indexOf(e), 1);
+      stored = stored.filter(function (r) { return r.id !== id; });
+      writeStore(stored);
+      return true;
     }
     stored.forEach(apply);
 
-    function keep(r) { r.id = 'r' + Date.now() + '-' + stored.length; var e = apply(r); if (e) { stored.push(r); writeStore(stored); } return e; }
+    var kept = 0;                                    /* never the list's length: an entry can be taken back, and an id must not come round again */
+    function keep(r) { r.id = 'r' + Date.now() + '-' + (kept++); var e = apply(r); if (e) { stored.push(r); writeStore(stored); } return e; }
     book = {
       demo: true, span: SPAN, today: today, now: now,
       manager: T.manager, team: team, companies: companies, products: PRODUCTS, why: WHY,
       events: function () { return events; },
       dateOf: dateOf, agoOf: agoOf, iso: iso, fromIso: fromIso,
       unit: function (code) { return byCode[String(code || '').trim().toUpperCase()] || null; },
+      /* is this unit for sale today? a code the sheet does not hold is not (fail closed) */
+      available: function (code) { return !!free[String(code || '').trim().toUpperCase()]; },
       productOf: productOf,
       recorded: function () { return stored.length; },
       /* r: { k, c: company index, m: salesperson index, m2, date: Date, p, u, v } */
       add: function (r) {
         var u = r.u ? book.unit(r.u) : null, d = agoOf(r.date);
         return keep({ k: r.k, c: companies[r.c], m: team[r.m].code, m2: r.m2 == null ? null : team[r.m2].code, date: iso(r.date), t: d === 0 ? now : 12 * 60,
-          p: u ? productOf(u) : r.p, u: r.u || null, area: u ? u.area : null, v: r.v || 0 });
+          p: u ? productOf(u) : r.p, u: r.u || null, area: u ? u.area : null, v: r.v || 0, of: r.of || null, made: iso(today) });
       },
+      remove: remove, removable: removable,
       cancel: function (id, date, why) { return keep({ k: 'cancel', of: id, date: iso(date), t: agoOf(date) === 0 ? now : 12 * 60, why: why }); },
       reset: function () { try { root.localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ } }
     };

@@ -14,7 +14,7 @@ const CONFIG = {
   /* Bumped on every deploy, and matched by the ?v= on every script tag in
      the HTML. That pair is what stops a returning phone running yesterday's
      JavaScript. See README, "Deploying". */
-  build: 120,
+  build: 121,
 
   /* Where the activity log is sent. Empty = kept on the device only, which
      is where it is today. Filling this in is the whole change when the
@@ -1052,8 +1052,12 @@ const CONFIG = {
      never be mistaken for somebody's real account. The name is accepted
      too, because a salesperson handed a phone will type that.        */
   users: [
-    { id: 'demo-sales',    name: 'Demo Salesperson',   email: 'sales@demo.local',    role: 'sales',         code: '1111', projects: ['moray', 'hrs'], phone: '' },
+    /* DEMOUSERS:START  the two demo accounts that sign in as real people: the salesperson is a member of
+       the team below (found by `staff`, so My activity is hers), the manager is its manager.
+       scripts/make-demo-publish.js rewrites these two lines unless it is run with --manager=real. */
+    { id: 'demo-sales',    name: 'Nada Osama',         email: 'sales@demo.local',    role: 'sales',         code: '1111', staff: 'MMD219', projects: ['moray', 'hrs'], phone: '' },
     { id: 'demo-manager',  name: 'Mina Magdy',         email: 'manager@demo.local',  role: 'sales_manager', code: '2222', projects: ['moray', 'hrs'], phone: '' },
+    /* DEMOUSERS:END */
     { id: 'demo-director', name: 'Demo Director',      email: 'director@demo.local', role: 'director',      code: '3333', projects: ['moray', 'hrs'], phone: '' }
   ],
   usersDemo: true,

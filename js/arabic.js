@@ -359,8 +359,16 @@ function hasArabic(text) {
  * but the same string — so every label in the document can go through this
  * without the English pages caring.
  */
+/* VOWEL MARKS ARE DROPPED IN A PDF (build 121). jsPDF does not position a mark
+ * on its letter, so a tanween, a kasra or a shadda prints BESIDE it as a stray
+ * tick: at page size it reads like "!" after the word. Arabic reads normally
+ * without them, and every measured width goes through this same call, so the
+ * text and its width still agree. The screen keeps the marks. Built from code
+ * points: an escape typed into an editing tool can land as the raw character. */
+const VOWEL_MARKS = new RegExp('[' + String.fromCharCode(0x064B) + '-' + String.fromCharCode(0x0652) + String.fromCharCode(0x0670) + ']', 'g');
+
 function forPdf(text) {
-  const s = String(text == null ? '' : text);
+  const s = String(text == null ? '' : text).replace(VOWEL_MARKS, '');
   if (!hasArabic(s)) return s;
   return visualOrder(shapeArabic(s));
 }
