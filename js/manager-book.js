@@ -1,0 +1,237 @@
+/* ------------------------------------------------------------------
+   Main Marks — the manager view's book of activity. A DEMO BOOK.
+
+   WHAT IS REAL: the manager and his team (js/config.js `salesTeam`, from
+   Main Marks' own sales structure), the brokerage companies (the list
+   "Who is this offer for?" already uses), and every unit, size and price
+   in a reservation or contract (a real available row of the inventory,
+   at that row's own live price).
+
+   WHAT IS INVENTED: that any of it happened. The app does not save a
+   send yet, and nobody records a meeting anywhere, so the requests,
+   broadcasts, meetings, reservations, contracts and cancellations are
+   drawn from a fixed seed. The page says "demo figures" on every screen
+   and DEMO on every download.
+
+   THE SHAPE IS THE CONTRACT. One row of activity is one event:
+     { id, k, c, m, m2, d, t, p, ch, u, area, v, why, end, endD, of }
+     k    'offer' | 'meeting' | 'reservation' | 'contract' | 'cancel' | 'orientation' | 'workshop'
+     c    company (index into `companies`); null on an offer = a broadcast
+     m    salesperson (index into `team`); m2 = the one the deal is split with
+     d    days ago; t = minute of that day
+     p    unit type; ch = 'post' | 'pdf' (how an offer was sent)
+     u    unit code; area in m2; v = price in EGP
+     why  a cancellation's reason; of = the reservation it cancels
+     end  on a reservation: 'contract' | 'cancel' (never deleted, only marked)
+   When the real store exists it hands js/manager.js this same object and
+   nothing on the page changes.
+
+   A MANAGER SEES HIS OWN TEAM ONLY (Muhanad, 2026-10-05). Main Marks is an
+   open race: every company is open to every salesperson. This book holds
+   one team's rows and nothing else, so the page cannot show another
+   team's activity with a company, not even a count.
+
+   WHEN. Everything is "days ago" from the real today, so the demo never
+   goes stale. Friday is the day off: a row that lands on one moves to the
+   Thursday before. Before 13:30 the demo clock reads 13:30, so the Today
+   screen is not empty when the page is opened early in the morning.
+   ------------------------------------------------------------------ */
+(function (root) {
+  'use strict';
+
+  var MM = root.MM || (root.MM = {});
+  var SPAN = 83;                                   /* the book goes back 12 weeks */
+  var KEY = 'mm.manager.records.v1';               /* what was recorded on this phone */
+  var WHY = ['Client withdrew', 'Payment not made', 'Moved to another unit', 'Other'];
+  var PRODUCTS = ['Commercial', 'Offices', 'The Fourth', 'Clinics', 'Serviced apartments'];
+
+  /* the sheet's Type and Floor -> the product a salesperson would name */
+  function productOf(u) {
+    var type = String(u.type || '').toLowerCase(), floor = String(u.floor || '').toLowerCase();
+    if (type === 'clinic') return 'Clinics';
+    if (type === 'commercial') return 'Commercial';
+    if (type === 'admin') return floor.indexOf('fourth') !== -1 ? 'The Fourth' : 'Offices';
+    return 'Serviced apartments';
+  }
+
+  function moray() {
+    var list = (typeof CONFIG !== 'undefined' && CONFIG.projects) || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === 'moray') return list[i];
+    return null;
+  }
+
+  function build(inv) {
+    var P = moray(), T = CONFIG.salesTeam;
+    var companies = (P.brokerages || []).slice();
+    var team = T.members.slice();
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var clock = new Date();
+    var now = Math.max(clock.getHours() * 60 + clock.getMinutes(), 13 * 60 + 30);
+
+    function dateOf(ago) { var d = new Date(today); d.setDate(d.getDate() - ago); return d; }
+    function agoOf(date) { return Math.round((today - new Date(date.getFullYear(), date.getMonth(), date.getDate())) / 864e5); }
+
+    /* the units a deal can sit on: available rows only, in a fixed order */
+    var pool = {}, byCode = {};
+    inv.all.forEach(function (u) { byCode[String(u.code).toUpperCase()] = u; });
+    inv.units.slice().sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; }).forEach(function (u) {
+      var p = productOf(u);
+      (pool[p] || (pool[p] = [])).push(u);
+    });
+    var sold = PRODUCTS.filter(function (p) { return pool[p] && pool[p].length; });
+    if (!sold.length || !companies.length || !team.length) throw new Error('Nothing to build the book from.');
+
+    var seed = 20261005;
+    function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    function ri(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }
+    function minute() { return ri(9 * 60, 20 * 60); }
+
+    var events = [], n = 0, taken = {};
+    function push(e) { e.id = 'g' + (n++); events.push(e); return e; }
+    function deal(k, ci, m, d, p) {
+      var list = pool[p] || pool[sold[0]], at = ri(0, list.length - 1), u = list[at], tries = 0;
+      while (taken[u.code] && tries++ < list.length) u = list[(at + tries) % list.length];
+      taken[u.code] = true;
+      var e = { k: k, c: ci, m: m, d: d, t: minute(), p: productOf(u), u: u.code, area: u.area, v: u.listPrice || u.finalPrice };
+      if (rnd() < .22) { var o = ri(0, team.length - 1); if (o !== m) e.m2 = o; }
+      return push(e);
+    }
+    /* A RESERVATION CAN BE CANCELLED (Muhanad, 2026-10-06). The cancellation is its own row with its own
+       date and reason; the reservation is kept and marked, never deleted, so the history stays true. */
+    function cancelRow(rs, d, why, t) {
+      rs.end = 'cancel'; rs.endD = d;
+      return { k: 'cancel', of: rs.id, c: rs.c, m: rs.m, m2: rs.m2, d: d, t: t, p: rs.p, u: rs.u, area: rs.area, v: rs.v, why: why };
+    }
+
+    companies.forEach(function (name, ci) {
+      var p = rnd(), w = [], i, k;
+      for (i = 0; i < 12; i++) w.push(0);
+      if (p < .30) { for (i = 0; i < 12; i++) w[i] = rnd() < .72 ? ri(1, 4) : 0; w[10 + ri(0, 1)] = ri(1, 4); }                          /* steady */
+      else if (p < .44) { for (i = 7; i < 12; i++) w[i] = rnd() < .7 ? ri(1, 4) : 0; w[10 + ri(0, 1)] = ri(1, 3); }                      /* started asking this month */
+      else if (p < .55) { for (i = 0; i < 9; i++) w[i] = rnd() < .75 ? ri(1, 4) : 0; w[8 + ri(0, 1)] = ri(1, 3); w[10] = 0; w[11] = 0; } /* gone quiet */
+      else if (p < .76) { for (i = 0; i < 6; i++) w[i] = rnd() < .5 ? ri(1, 3) : 0; w[ri(0, 5)] = ri(1, 3); }                            /* inactive */
+      var total = w.reduce(function (a, b) { return a + b; }, 0), last4 = w[8] + w[9] + w[10] + w[11], last2 = w[10] + w[11];
+      var shape = !total ? 'never' : !last4 ? 'inactive' : !last2 ? 'quiet' : 'active';
+      var members = [], count = total ? ri(1, 3) : 0;
+      for (k = 0; k < count; k++) { var m = ri(0, team.length - 1); if (members.indexOf(m) === -1) members.push(m); }
+      var prods = []; for (k = 0; k < ri(1, 2); k++) { var pr = sold[ri(0, sold.length - 1)]; if (prods.indexOf(pr) === -1) prods.push(pr); }
+      var mine = [];
+      w.forEach(function (cnt, wi) {
+        for (k = 0; k < cnt; k++) {
+          var d = (11 - wi) * 7 + ri(0, 6);
+          mine.push(push({ k: 'offer', c: ci, m: members[rnd() < .6 ? 0 : ri(0, members.length - 1)], d: d, t: minute(), p: prods[ri(0, prods.length - 1)], ch: rnd() < .55 ? 'post' : 'pdf' }));
+        }
+      });
+      var meets = (shape === 'active' && rnd() < .5) ? ri(1, 3) : (shape === 'quiet' && rnd() < .25 ? 1 : (shape === 'inactive' && rnd() < .12 ? 1 : 0));
+      for (k = 0; k < meets && mine.length; k++) {
+        var src = mine[ri(0, mine.length - 1)], md = Math.max(0, src.d - ri(1, 5));
+        push({ k: 'meeting', c: ci, m: src.m, d: md, t: minute(), p: src.p });
+        if (rnd() < .62) {
+          var rd = Math.max(0, md - ri(1, 6)), rs = deal('reservation', ci, src.m, rd, src.p), fate = rnd();
+          if (fate < .4 && rd > 1) { var ct = deal('contract', ci, src.m, Math.max(0, rd - ri(2, 9)), src.p); ct.p = rs.p; ct.u = rs.u; ct.area = rs.area; ct.v = rs.v; ct.m2 = rs.m2; rs.end = 'contract'; }
+          else if (fate < .68 && rd > 1) push(cancelRow(rs, Math.max(0, rd - ri(1, 8)), WHY[ri(0, WHY.length - 2)], minute()));
+        }
+      }
+    });
+    /* general broadcasts: an offer sent to nobody in particular */
+    var HABIT = [.45, .3, .25, .55, .2, .3, .35];
+    team.forEach(function (tm, m) {
+      for (var d = 0; d <= SPAN; d++) if (rnd() < HABIT[m % HABIT.length]) for (var k = ri(1, 2); k > 0; k--) push({ k: 'offer', c: null, m: m, d: d, t: minute(), p: sold[ri(0, sold.length - 1)], ch: 'post' });
+    });
+    /* so the demo always shows the case: two of this month's open reservations are cancelled */
+    events.filter(function (e) { return e.k === 'reservation' && !e.end && e.d > 3 && e.d < 27; }).slice(0, 2).forEach(function (rs, i) { push(cancelRow(rs, rs.d - 2 - i, WHY[i], minute())); });
+
+    /* ORIENTATIONS AND WORKSHOPS (Muhanad, 2026-10-06). How a salesperson works a brokerage: an
+       orientation at its office to present the project, offers in its WhatsApp group after that, and a
+       workshop there when it sends many requests and brings no meeting. Each is its own row:
+       { k: 'orientation' | 'workshop', c, m, m2 (who also went), d, t }.
+       Drawn from a SECOND seed, after everything above, so not one earlier figure moves. The demo holds
+       every case on purpose: a visit that was followed by a first request, by a company coming back, by
+       a first meeting, and visits that were followed by nothing. */
+    var seed2 = 20261006;
+    function rnd2() { seed2 |= 0; seed2 = seed2 + 0x6D2B79F5 | 0; var t = Math.imul(seed2 ^ seed2 >>> 15, 1 | seed2); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    function ri2(a, b) { return a + Math.floor(rnd2() * (b - a + 1)); }
+    function visit(k, ci, m, d) { push({ k: k, c: ci, m: m, d: Math.max(0, Math.min(SPAN, d)), t: ri2(10 * 60, 17 * 60) }); }
+    companies.forEach(function (name, ci) {
+      var oldest = function (a, b) { return b.d - a.d; };
+      var asks = events.filter(function (e) { return e.c === ci && e.k === 'offer'; }).sort(oldest);
+      var meets = events.filter(function (e) { return e.c === ci && e.k === 'meeting'; }).sort(oldest);
+      var i, lately = asks.filter(function (e) { return e.d < 30; }).length;
+      if (!asks.length) { if (rnd2() < .22) visit('orientation', ci, ri2(0, team.length - 1), ri2(3, 40)); return; }
+      if (asks[0].d < 70 && rnd2() < .75) visit('orientation', ci, asks[0].m, asks[0].d + ri2(2, 6));                  /* then it started asking */
+      for (i = 1; i < asks.length; i++) if (asks[i - 1].d - asks[i].d >= 21 && rnd2() < .6) visit('orientation', ci, asks[i].m, asks[i].d + ri2(1, 4));   /* then it came back */
+      if (meets.length) { if (asks.filter(function (e) { return e.d > meets[0].d; }).length >= 5 && rnd2() < .6) visit('workshop', ci, meets[0].m, meets[0].d + ri2(3, 8)); }   /* then its first meeting */
+      else if (lately >= 6 && rnd2() < .25) visit('workshop', ci, asks[asks.length - 1].m, ri2(2, 12));               /* and no meeting yet */
+    });
+
+    /* Friday is the day off: nothing is sent or signed on one */
+    events.forEach(function (e) { if (dateOf(e.d).getDay() === 5) e.d = e.d < SPAN ? e.d + 1 : e.d - 1; });
+    events.forEach(function (e) { if (e.k === 'reservation' && e.end === 'cancel') { var c = events.filter(function (x) { return x.of === e.id; })[0]; if (c) { c.d = Math.min(c.d, e.d); e.endD = c.d; } } });
+    /* today's later hours have not happened yet; and one salesperson has sent nothing today, so the page shows that case */
+    var idle = Math.min(4, team.length - 1);
+    events = events.filter(function (e) { return !(e.d === 0 && e.t > now) && !(e.m === idle && e.d === 0 && e.k === 'offer'); });
+    /* a reservation whose contract or cancellation falls later today has not ended yet: it is still open */
+    events.forEach(function (e) {
+      if (e.k !== 'reservation' || !e.end) return;
+      var ended = events.some(function (x) { return e.end === 'cancel' ? x.of === e.id : (x.k === 'contract' && x.c === e.c && x.u === e.u); });
+      if (!ended) { delete e.end; delete e.endD; }
+    });
+
+    /* ---- what was recorded on this phone, kept across visits -------- */
+    var book;
+    function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function fromIso(s) { var p = String(s).split('-'); return p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : null; }
+    function readStore() { try { var a = JSON.parse(root.localStorage.getItem(KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+    function writeStore(a) { try { root.localStorage.setItem(KEY, JSON.stringify(a)); } catch (e) { /* this visit only */ } }
+    var stored = readStore();
+    function codeAt(code) { for (var i = 0; i < team.length; i++) if (team[i].code === code) return i; return -1; }
+    function apply(r) {
+      var date = fromIso(r.date); if (!date) return null;
+      var d = Math.max(0, Math.min(SPAN, agoOf(date)));
+      if (r.k === 'cancel') {
+        var rs = events.filter(function (e) { return e.id === r.of && e.k === 'reservation' && !e.end; })[0];
+        if (!rs) return null;
+        var ce = cancelRow(rs, Math.min(d, rs.d), r.why, r.t); ce.id = r.id; ce.mine = true; rs.endD = ce.d;
+        events.push(ce); return ce;
+      }
+      var c = companies.indexOf(r.c), m = codeAt(r.m);
+      if (c === -1 || m === -1) return null;
+      var e = { id: r.id, mine: true, k: r.k, c: c, m: m, d: d, t: r.t, p: r.p };
+      var m2 = codeAt(r.m2);
+      if (r.k === 'reservation' || r.k === 'contract') { e.u = r.u; e.area = r.area || null; e.v = r.v; }
+      if (r.k !== 'meeting' && m2 !== -1 && m2 !== m) e.m2 = m2;       /* a deal split with, or a visit made with */
+      events.push(e); return e;
+    }
+    stored.forEach(apply);
+
+    function keep(r) { r.id = 'r' + Date.now() + '-' + stored.length; var e = apply(r); if (e) { stored.push(r); writeStore(stored); } return e; }
+    book = {
+      demo: true, span: SPAN, today: today, now: now,
+      manager: T.manager, team: team, companies: companies, products: PRODUCTS, why: WHY,
+      events: function () { return events; },
+      dateOf: dateOf, agoOf: agoOf, iso: iso, fromIso: fromIso,
+      unit: function (code) { return byCode[String(code || '').trim().toUpperCase()] || null; },
+      productOf: productOf,
+      recorded: function () { return stored.length; },
+      /* r: { k, c: company index, m: salesperson index, m2, date: Date, p, u, v } */
+      add: function (r) {
+        var u = r.u ? book.unit(r.u) : null, d = agoOf(r.date);
+        return keep({ k: r.k, c: companies[r.c], m: team[r.m].code, m2: r.m2 == null ? null : team[r.m2].code, date: iso(r.date), t: d === 0 ? now : 12 * 60,
+          p: u ? productOf(u) : r.p, u: r.u || null, area: u ? u.area : null, v: r.v || 0 });
+      },
+      cancel: function (id, date, why) { return keep({ k: 'cancel', of: id, date: iso(date), t: agoOf(date) === 0 ? now : 12 * 60, why: why }); },
+      reset: function () { try { root.localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ } }
+    };
+    return book;
+  }
+
+  /* Resolves to the book; rejects when the inventory cannot be read, because a
+     deal with an invented unit and price is worse than no page. */
+  function load() {
+    var P = moray();
+    if (!P || !P.inventory || !CONFIG.salesTeam) return Promise.reject(new Error('The manager view is not set up.'));
+    return MM.inventory.load(P.inventory).then(build);
+  }
+
+  MM.managerBook = { load: load };
+}(typeof window !== 'undefined' ? window : globalThis));

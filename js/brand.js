@@ -301,6 +301,16 @@
     menu.hidden = true;
     menu.appendChild(el('p', 'who-n', name));
     if (o.role) menu.appendChild(el('p', 'who-r', o.role));
+    /* build 115: a sales manager's way from the sales app to his team (manager.html) */
+    if (session && session.role === 'sales_manager' && CONFIG.salesTeam && !o.noMode && box.parentNode && !box.parentNode.querySelector('.mode-switch')) {
+      var team = el('a', 'mode-switch');
+      team.href = 'manager.html';
+      team.setAttribute('aria-label', t('Team Pulse'));
+      team.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2.5-7 4 14 2.5-7h5"/></svg>';
+      team.appendChild(el('span', null, t('Team Pulse')));
+      box.parentNode.insertBefore(team, box);
+      box.parentNode.classList.add('has-mode');
+    }
     var out = el('button', 'who-out', t('Sign out'));
     out.type = 'button';
     out.addEventListener('click', function () { if (o.onOut) o.onOut(); });

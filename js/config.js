@@ -14,7 +14,7 @@ const CONFIG = {
   /* Bumped on every deploy, and matched by the ?v= on every script tag in
      the HTML. That pair is what stops a returning phone running yesterday's
      JavaScript. See README, "Deploying". */
-  build: 114,
+  build: 120,
 
   /* Where the activity log is sent. Empty = kept on the device only, which
      is where it is today. Filling this in is the whole change when the
@@ -1053,10 +1053,35 @@ const CONFIG = {
      too, because a salesperson handed a phone will type that.        */
   users: [
     { id: 'demo-sales',    name: 'Demo Salesperson',   email: 'sales@demo.local',    role: 'sales',         code: '1111', projects: ['moray', 'hrs'], phone: '' },
-    { id: 'demo-manager',  name: 'Demo Sales Manager', email: 'manager@demo.local',  role: 'sales_manager', code: '2222', projects: ['moray', 'hrs'], phone: '' },
+    { id: 'demo-manager',  name: 'Mina Magdy',         email: 'manager@demo.local',  role: 'sales_manager', code: '2222', projects: ['moray', 'hrs'], phone: '' },
     { id: 'demo-director', name: 'Demo Director',      email: 'director@demo.local', role: 'director',      code: '3333', projects: ['moray', 'hrs'], phone: '' }
   ],
   usersDemo: true,
+
+  /* THE MANAGER VIEW'S TEAM (manager.html). One real team out of Main Marks'
+     own structure (Desktop\Moray - Main Marks\05 Sales & pricing\New Sales
+     Structure.xlsx, read 2026-10-05): one sales manager and the seven people
+     under him. The demo manager account above signs in as him. Assistant managers
+     and supervisors are sellers with a higher title: no extra rights.
+     REAL NAMES AND STAFF CODES. scripts/make-demo-publish.js cuts everything
+     between the two markers out of the public copy unless it is run with
+     --manager=real, and refuses to finish if a name or code is still in it.
+     Ask Muhanad before real names go on a public link. Without this block the
+     app has no manager view: sign-in and the header check for it. */
+  /* SALESTEAM:START */
+  salesTeam: {
+    manager: { name: 'Mina Magdy', title: 'Sales Manager', code: 'MMD031', reportsTo: 'Sherif Essam', reportsTitle: 'Sales Director' },
+    members: [
+      { name: 'Mereham Ayman',        title: 'Assistant Sales Manager',    code: 'MMD155' },
+      { name: 'Nouran Hany',          title: 'Sales Supervisor',           code: 'MMD188' },
+      { name: 'Fady Hany',            title: 'Sales Supervisor',           code: 'MMD168' },
+      { name: 'Ahmed Hussein',        title: 'Senior Property Consultant', code: 'MMD193' },
+      { name: 'Abd el-Rahman Fathi',  title: 'Senior Property Consultant', code: 'MMD218' },
+      { name: 'Nada Osama',           title: 'Senior Property Consultant', code: 'MMD219' },
+      { name: 'Rojan Osama',          title: 'Senior Property Consultant', code: 'MMD241' }
+    ]
+  },
+  /* SALESTEAM:END */
 
   roles: {
     sales:         { label: 'Salesperson',   canOffer: true,  canSeeTeam: false, canSeeAll: false },

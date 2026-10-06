@@ -28,7 +28,11 @@
      that points anywhere else is ignored rather than followed. */
   function nextPage() {
     var raw = new URLSearchParams(location.search).get('next') || '';
-    if (!raw) return 'projects.html';
+    /* build 116: a sales manager chooses between his team and the sales app */
+    var me = MM.auth.current();
+    /* build 120: only where the manager view is set up (CONFIG.salesTeam). A copy published without it
+       has no start.html, and a manager must land on the projects, not on a missing page. */
+    if (!raw) return me && me.role === 'sales_manager' && CONFIG.salesTeam ? 'start.html' : 'projects.html';
     if (/^[a-z0-9\-]+\.html(\?[^#]*)?$/i.test(raw)) return raw;
     return 'projects.html';
   }
@@ -94,6 +98,9 @@
     if (!r.ok) { fail(t(r.why)); code.select(); return; }
 
     var next = nextPage();
+    /* the crossing's second line names where it lands */
+    var line = document.querySelector('.xf-select');
+    if (line && /^start.html/.test(next)) line.textContent = t('Choose where to go');
     /* Reduced motion still gets the hand-over, just none of the
        theatre: a plain 250ms cross-fade, no lines and no message.
        MM.xfade.cross reads the preference itself. */

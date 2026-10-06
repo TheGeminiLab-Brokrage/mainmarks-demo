@@ -3217,3 +3217,89 @@ body.is-ready .mv-hint { opacity: 1; }
 [dir="rtl"] .q-who-in, [dir="rtl"] .q-post-text { text-align: right; }
 /* back points the way Arabic reads: to the right */
 [dir="rtl"] .back svg, [dir="rtl"] .q-cta svg, [dir="rtl"] .signin-btn svg:not(.tick), [dir="rtl"] .c-go svg, [dir="rtl"] .l-go svg { transform: scaleX(-1); }
+
+/* ---- start.html: the two cards a sales manager lands on (builds 116-117) ----
+   The project card's frame and glow. Where a project card has its render,
+   these have a small drawing of what is behind the door: the gauge of the
+   manager view, and the three steps of an offer. Drawings, not figures:
+   nothing here is a number. */
+.start-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mm-card.start {
+  border-color: rgba(247, 149, 30, .42);
+  box-shadow: 0 0 0 1px rgba(247, 149, 30, .10), 0 22px 60px -34px rgba(247, 149, 30, .45);
+}
+.mm-card.start:hover,
+.mm-card.start:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--orange);
+  box-shadow: 0 16px 40px -18px rgba(247, 149, 30, .55);
+  outline: none;
+}
+.mm-card.start:hover .c-go svg { transform: translateX(4px); }
+.st-art {
+  position: relative;
+  height: 230px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 22px 26px;
+  border-bottom: 1px solid var(--card-line);
+  background: radial-gradient(120% 90% at 50% 110%, rgba(247, 149, 30, .16), transparent 62%), #0b0b0c;
+  overflow: hidden;
+}
+.st-body { display: flex; flex-direction: column; gap: 10px; padding: 22px 26px 22px; flex: 1; }
+.st-kind { font-size: 10.5px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.st-name { font-size: 34px; font-weight: 300; letter-spacing: -.03em; line-height: 1.05; color: var(--white); }
+.st-blurb { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 42ch; }
+.mm-card.start .c-go { border-top: 1px solid var(--card-line); margin-top: 8px; }
+
+/* Team Pulse: the half-dial, a heartbeat through it, and its key */
+.st-gauge { width: 210px; max-width: 70%; height: auto; overflow: visible; }
+.st-gauge path { fill: none; stroke-linecap: round; }
+.st-gauge .g-track { stroke: rgba(255, 255, 255, .09); stroke-width: 12; }
+.st-gauge .g-arc { stroke-width: 12; animation: st-sweep 1.3s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--k) * 140ms + 500ms); }
+.st-gauge .g-a { stroke: #2FBF8F; filter: drop-shadow(0 0 6px rgba(47, 191, 143, .5)); }
+.st-gauge .g-q { stroke: #F2C037; }
+.st-gauge .g-i { stroke: #7C8794; }
+.st-gauge .g-beat { stroke: var(--orange); stroke-width: 3; stroke-linejoin: round; stroke-dasharray: 190; animation: st-beat 2.6s ease-in-out 1.2s infinite; filter: drop-shadow(0 0 6px rgba(247, 149, 30, .7)); }
+@keyframes st-sweep { from { stroke-dasharray: 0 629; } }
+@keyframes st-beat { 0% { stroke-dashoffset: 190; } 55%, 100% { stroke-dashoffset: 0; } }
+.st-key { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 11.5px; color: var(--muted); }
+.st-key span { display: inline-flex; align-items: center; gap: 6px; }
+.st-key i { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Quick Offer: project, unit, offer; the last one lit */
+.st-flow { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; max-width: 380px; }
+.st-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11.5px; color: var(--muted); text-align: center; }
+.st-step .st-node { position: relative; z-index: 1; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: #141415; border: 1px solid rgba(255, 255, 255, .18); color: var(--white); }
+.st-step .st-node svg { width: 24px; height: 24px; }
+.st-step + .st-step::before { content: ""; position: absolute; top: 29px; inset-inline-end: 50%; width: 100%; height: 1px; background: linear-gradient(90deg, rgba(255, 255, 255, .18), rgba(247, 149, 30, .7)); }
+[dir="rtl"] .st-step + .st-step::before { background: linear-gradient(270deg, rgba(255, 255, 255, .18), rgba(247, 149, 30, .7)); }
+.st-step.is-lit { color: var(--white); }
+.st-step.is-lit .st-node { background: var(--orange); border-color: var(--orange); color: #000; animation: st-ping 2.4s ease-out 1s infinite; }
+@keyframes st-ping { 0% { box-shadow: 0 0 0 0 rgba(247, 149, 30, .55); } 70%, 100% { box-shadow: 0 0 0 18px rgba(247, 149, 30, 0); } }
+
+[dir="rtl"] .mm-card.start { text-align: right; }
+[dir="rtl"] .mm-card.start .c-go svg { transform: scaleX(-1); }
+[dir="rtl"] .st-kind, [dir="rtl"] .st-name { letter-spacing: 0; }
+
+/* the way across, for a sales manager: a pill in the header of every sales page */
+.top.has-mode { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+/* its own class, NOT .lang-switch: js/i18n.js adds the language switch only when no .lang-switch exists */
+.mode-switch { justify-self: end; height: 30px; padding: 0 12px; border-radius: 15px; font-size: 12.5px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; color: var(--orange); background: color-mix(in srgb, var(--white) 8%, transparent); border: 1px solid rgba(247, 149, 30, .45); white-space: nowrap; }
+.mode-switch:hover, .mode-switch:focus-visible { border-color: var(--orange); outline: none; }
+.mode-switch svg { width: 14px; height: 14px; flex: none; }
+
+@media (max-width: 720px) {
+  .start-cards { grid-template-columns: 1fr; }
+  .st-art { height: 176px; padding: 16px; gap: 10px; }
+  .st-gauge { width: 168px; }
+  .st-step .st-node { width: 50px; height: 50px; }
+  .st-step + .st-step::before { top: 25px; }
+  .st-body { padding: 18px 20px 18px; }
+  .st-name { font-size: 28px; }
+}
+@media (max-width: 480px) { .mode-switch { padding: 0 9px; } .mode-switch span { display: none; } }
+@media (prefers-reduced-motion: reduce) { .st-gauge .g-arc, .st-gauge .g-beat, .st-step.is-lit .st-node { animation: none; } }
