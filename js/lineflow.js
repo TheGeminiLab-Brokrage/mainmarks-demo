@@ -433,7 +433,8 @@
         askAudience(function (who) {
           MM.post.open({
             project: p, line: l, options: opts, all: rows, who: who, session: session, demo: demo,
-            kit: { handheld: handheld, canShare: canShare, shareOrTimeOut: shareOrTimeOut, saveFile: saveFile }
+            onSent: sent(who, 'post', null, offerKey(opts.map(function (x) { return { code: x.unit.code, plan: x.plan && x.plan.id }; }))),
+            kit: { handheld: handheld, canShare: canShare, shareOrTimeOut: shareOrTimeOut, saveFile: saveFile, sentWords: sentWords }
           });
         }, { postOnly: true });
       });
@@ -499,8 +500,10 @@
     refresh.addEventListener('click', load);
     sel.addEventListener('change', function () { selectBuilding(sel.value, false); });
 
+    /* build 126 (Muhanad, 2026-10-07): a tap moves the page to the next step at EVERY width. It used to
+       happen on a phone only, and on a laptop the next step opened below the fold and had to be found. */
     function go(section) {
-      if (window.matchMedia('(max-width: 820px)').matches) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     /* ---- 1 → 2 ------------------------------------------------------------ */
@@ -909,7 +912,18 @@
       var copy = el('button', 'q-ghost', t('Copy offer text'));
       copy.type = 'button';
       var note = el('span', 'q-note');
-      actions.appendChild(send); actions.appendChild(copy); actions.appendChild(note);
+      /* build 134: once the store has saved an offer PDF it says how many times that offer has gone, and
+         this line says so, as the post sheet does: always for a general broadcast, and for a special
+         request when it was joined to one sent before (the same unit, the same company, ten minutes). */
+      var counted = el('span', 'q-note q-counted'); counted.hidden = true; counted.setAttribute('aria-live', 'polite');
+      function paintCounted(e) {
+        var n = e ? Number(e.rounds) : 0, broadcast = !(e && e.company_id);
+        if (!n || (!broadcast && n < 2)) return;
+        counted.textContent = sentWords(e, n, broadcast);
+        counted.hidden = false;
+      }
+      /* build 126: "Copy offer text" is off the page (Muhanad, 2026-10-07). The post has its own "Copy text". */
+      actions.appendChild(send); actions.appendChild(note); actions.appendChild(counted);
       var assume = el('ul', 'q-assume');
       (p.assumptions || []).forEach(function (a) { assume.appendChild(el('li', null, t(a))); });
 
@@ -920,6 +934,7 @@
         var s = MM.plans.schedule({ listPrice: u.listPrice, discount: pl.discount || 0, plan: pl, terms: p.terms });
         figures.textContent = '';
         current = null;
+        counted.hidden = true;                                   /* another plan is another offer */
         if (!s || s.broken) {
           /* a schedule that does not foot is not shown at all */
           figures.appendChild(el('p', 'q-empty', t('This plan could not be worked out for this unit, so it is not shown.')));
@@ -1019,8 +1034,8 @@
           if (who.format === 'post' && MM.post) {
             MM.post.open({
               project: p, line: l, unit: c.u, plan: c.pl, buildingName: c.b && c.b.name, who: who,
-              session: session, demo: demo,
-              kit: { handheld: handheld, canShare: canShare, shareOrTimeOut: shareOrTimeOut, saveFile: saveFile }
+              session: session, demo: demo, onSent: sent(who, 'post', c.u, offerKey([{ code: c.u.code, plan: c.pl && c.pl.id }])),
+              kit: { handheld: handheld, canShare: canShare, shareOrTimeOut: shareOrTimeOut, saveFile: saveFile, sentWords: sentWords }
             });
             return;
           }
@@ -1034,15 +1049,18 @@
             });
             return;
           }
-          deliver(made, offerText());       /* still inside the Continue tap */
+          deliver(made, offerText(), sent(who, 'pdf', c.u, offerKey([{ code: c.u.code, plan: c.pl && c.pl.id }])));       /* still inside the Continue tap */
         }, { ready: ready, withPdf: withPdf });
       });
       /* the offer leaves the app. A phone: the PDF (and the text) through its
          share sheet. A laptop: WhatsApp Web with the text, and the PDF saved to
          attach, because a laptop's share flyout can hang for ever (playbook 01,
          4) and wa.me cannot carry a file (5). No PDF for this unit: the text. */
-      function deliver(made, text) {
+      function deliver(made, text, leaves) {
         var file = null;
+        /* build 134: 'ok' also asks to be told the store's row, for the line above */
+        counted.hidden = true;
+        var left = function (stage) { if (stage === 'ok') leaves('ok', paintCounted); else leaves(stage); };
         try { if (made) file = new File([made.blob], made.name, { type: 'application/pdf' }); } catch (e) { file = null; }
         /* copy the text FIRST: once the share sheet is open the page has lost
            focus and the clipboard refuses; WhatsApp on an iPhone often drops
@@ -1051,16 +1069,20 @@
         if (file && handheld() && canShare({ files: [file] })) {
           var payload = canShare({ files: [file], text: text }) ? { files: [file], text: text } : { files: [file] };
           note.textContent = '';
+          left('start');
           shareOrTimeOut(payload).then(function () {
+            left('ok');
             note.textContent = t('Offer PDF shared. The text is copied too, in case WhatsApp drops it.');
           }, function (e) {
-            if (e && e.name === 'AbortError') return;          /* the agent closed the sheet: a decision, not a failure */
+            if (e && e.name === 'AbortError') { left('no'); return; }          /* the agent closed the sheet: a decision, not a failure */
+            left('ok');
             saveFile(file);
             note.textContent = t('Could not open the share sheet, so the PDF was saved. The text is copied.');
           });
           return;
         }
         window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+        left('ok');
         if (file) { saveFile(file); note.textContent = t('WhatsApp opened with the text. The offer PDF is downloaded: attach it there.'); }
       }
       copy.addEventListener('click', function () {
@@ -1096,13 +1118,52 @@
        phone passes the company the request came from. Recorded nowhere yet:
        the activity log is the back end's job. */
     var AUD_KEY = 'mm.audience';
+    /* build 127: THE OFFER LEFT THE APP, so it is saved to the store (js/auth.js logOffer; nothing on
+       the demo). Called where the share sheet took it or WhatsApp opened, never when the agent closed
+       the share sheet. A post of several options is one answer to one request: one row, no unit. */
+    var SOLD_AS = { commercial: 'Commercial', admin: 'Offices', fourth: 'The Fourth', wellness: 'Clinics', residence: 'Serviced apartments' };
+    /* Returns one function, called with 'start' just before a phone's share sheet opens, 'ok' when the
+       offer went, 'no' when the agent closed the sheet. On a phone the row is on the phone before the
+       sheet opens, so a page the phone throws away while he is in WhatsApp still saves the offer. */
+    /* build 129: WHAT THE OFFER IS, for the store: the unit or units, each with its plan. The same key
+       from the same person on the same day is the same general broadcast sent again, and the store
+       counts it once (mm_log_offer). items: [{ code, plan: plan id or nothing }] */
+    function offerKey(items) {
+      return items.map(function (x) { return x && x.code ? String(x.code).toUpperCase() + (x.plan ? ':' + x.plan : '') : ''; }).filter(Boolean).sort().join('+');
+    }
+    /* build 134: WHAT THE STORE SAYS ABOUT A SEND, in the agent's words (Muhanad, 2026-10-09). A general
+       broadcast is one however many times it goes that day; a special request is one when the same unit
+       goes again to the same company within ten minutes; a post and a PDF count alike, and when the
+       offer went both ways the line says how many of each. e: the store's row; n: how many times it has
+       gone (the post sheet counts its own sends ahead of the store's answer). */
+    function sentWords(e, n, broadcast) {
+      var s = broadcast ? (n === 1 ? t('Sent once. Counted as one broadcast.') : t('Sent {n} times. Counted as one broadcast.', { n: n }))
+                        : t('Sent {n} times. Counted as one special request.', { n: n });
+      var a = e ? Number(e.sent_pdf) : 0, b = e ? Number(e.sent_post) : 0;
+      if (a > 0 && b > 0 && a + b === n) s += ' ' + t('As an offer PDF: {a}. As a WhatsApp post: {b}.', { a: a, b: b });
+      return s;
+    }
+    function sent(who, channel, u, key) {
+      var ref = null;
+      var row = { company: who && who.audience === 'broker' ? who.company : null, propose: !!(who && who.audience === 'broker' && who.isNew), product: SOLD_AS[l.id] || null, channel: channel,
+        unit: u ? u.code : null, area: u ? u.area : null, value: u ? (u.listPrice || u.finalPrice || null) : null, key: key || null };
+      /* saved: told the store's row once this send is saved (the post sheet shows its count) */
+      return function (stage, saved) {
+        if (!MM.auth.offerLeaving) return;
+        if (stage === 'start') { ref = MM.auth.offerLeaving(row); return; }
+        if (stage === 'no') { MM.auth.offerNotSent(ref); ref = null; return; }
+        if (!ref) ref = MM.auth.offerLeaving(row);
+        MM.auth.offerLeft(ref, saved); ref = null;
+      };
+    }
     /* how.ready (build 88): the offer PDF being made for a real phone; Continue
        waits for it, so the share sheet can open inside that tap */
     function askAudience(then, how) {
       var last = null;
       try { last = JSON.parse(sessionStorage.getItem(AUD_KEY) || 'null'); } catch (e) { last = null; }
       var demo = demoPhone(), asked = demo && demo.request && demo.request.company;
-      var list = (p.brokerages || []).map(function (b) { return typeof b === 'string' ? b : b.name; }).filter(Boolean);
+      /* build 125: on the store, the admin's list of companies (kept on the phone); otherwise the file's */
+      var list = ((MM.auth.companyList && MM.auth.companyList()) || p.brokerages || []).map(function (b) { return typeof b === 'string' ? b : b.name; }).filter(Boolean);
 
       var box = el('div', 'q q-who');
       box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-labelledby', 'qWhoH');
@@ -1120,9 +1181,18 @@
         opts.appendChild(b);
         return b;
       }
+      /* build 140 (Muhanad, 2026-10-10): "the manger will not sent bodcast it is not part of his job". A
+         sales manager's offer is the rare one he sends for a sales agent the broker could not reach
+         ("the sales in the brokrage company was not able to get on hold of the sales so he reached ihis
+         manger"). It always names the company that asked, so it is counted on that company's page, and
+         he hands it to that sales agent on Team Pulse afterwards. So he is not offered the general
+         broadcast, and the store refuses one from him (mm_log_offer). */
+      var session = MM.auth.current && MM.auth.current();
+      var forAgent = !!(MM.auth.real && MM.auth.real() && session && session.role === 'sales_manager');
       opt('broker', 'Special request', 'A broker asked for it. Counted for their company.');
-      opt('broadcast', 'General broadcast', 'Groups, channels, status. No single company.');
+      if (!forAgent) opt('broadcast', 'General broadcast', 'Groups, channels, status. No single company.');
       card.appendChild(opts);
+      if (forAgent) card.appendChild(el('p', 'q-who-note', t('After sending, hand it to the sales agent on Team Pulse.')));
 
       /* the company: TYPED, with a dropdown of the brokerage list that
          narrows as you type (build 85; a <datalist> shows nothing on an
@@ -1139,7 +1209,18 @@
       var drop = el('ul', 'q-who-list'); drop.id = 'qWhoList'; drop.setAttribute('role', 'listbox'); drop.hidden = true;
       field.appendChild(inp); field.appendChild(drop);
       co.appendChild(field);
-      if (!list.length) co.appendChild(el('span', 'q-who-note', t('Main Marks’ brokerage list will fill this once it is sent. Type the company for now.')));
+      /* build 127: on the store, the company is one on the admin's list, or a name he sends for approval */
+      var STORE = !!(MM.auth.real && MM.auth.real()), fresh = null;
+      /* build 128: THE REAL APP'S FILE CARRIES NO COMPANY LIST (it was readable without signing in). A
+         phone that has not fetched the admin's list yet fetches it as this sheet opens. Until it lands
+         no name can be sent for approval: against an empty list every company would look unlisted. */
+      var loading = STORE && !list.length && !!MM.auth.loadCompanies, listNote = null;
+      if (!list.length) {
+        listNote = el('span', 'q-who-note', STORE ? t('Loading the companies…') : t('Main Marks’ brokerage list will fill this once it is sent. Type the company for now.'));
+        co.appendChild(listNote);
+      }
+      var newNote = el('p', 'q-who-note'); newNote.hidden = true;
+      co.appendChild(newNote);
       card.appendChild(co);
 
       /* build 90: SEND IT AS the offer PDF or a WhatsApp post (Muhanad,
@@ -1172,14 +1253,22 @@
         check();
       }
 
-      var names = asked && list.indexOf(asked) > 0 ? [asked].concat(list.filter(function (n) { return n !== asked; })) : list;
+      /* the names offered, and their folded forms for the matching below; set again when the list lands */
+      var names = [], folded = {};
+      function setNames(l) {
+        names = asked && l.indexOf(asked) > 0 ? [asked].concat(l.filter(function (n) { return n !== asked; })) : l;
+        folded = {};
+        names.forEach(function (n) {
+          folded[n] = { all: fold(n), words: String(n).split(/[\s\-_.,&/()]+/).map(fold).filter(Boolean) };
+        });
+      }
       var hi = -1;
       /* build 91 (Muhanad: "every letter he types, the list filters to
          whatever is close to what he is typing"): FORGIVING matching. Case,
          spaces and punctuation are ignored and Arabic letter forms folded
          (أ إ آ -> ا, ة -> ه, ى -> ي), then, best first: the name starts with
          it, a word in it does ("banker"), it is inside it, its letters come
-         in order ("nwy" -> Nawy), or it is one slip away ("nawi" -> Nawy; two
+         in order ("acm" -> Acme), or it is one slip away ("acmi" -> Acme; two
          for six letters or more). Nothing close: the list says so, and the
          name is kept as typed. */
       function fold(s) {
@@ -1203,10 +1292,7 @@
         }
         return prev[b.length];
       }
-      var folded = {};
-      names.forEach(function (n) {
-        folded[n] = { all: fold(n), words: String(n).split(/[\s\-_.,&/()]+/).map(fold).filter(Boolean) };
-      });
+      setNames(list);
       function score(n, q) {
         var f = folded[n], all = f.all, words = f.words, i, j;
         if (all.indexOf(q) === 0) return 100;
@@ -1266,9 +1352,7 @@
         if (!open || (m.length === 1 && m[0] === typed)) {
           drop.hidden = true; inp.setAttribute('aria-expanded', 'false'); return;
         }
-        if (!m.length) {
-          drop.appendChild(el('li', 'q-who-none', t('No company in the list is close to “{typed}”. It will be kept as typed.', { typed: typed })));
-        }
+        if (!m.length && !STORE) drop.appendChild(el('li', 'q-who-none', t('No company in the list is close to “{typed}”. It will be kept as typed.', { typed: typed })));
         if (hi >= m.length) hi = m.length - 1;
         m.forEach(function (n, i) {
           var li = el('li', 'q-who-item' + (i === hi ? ' is-hi' : ''));
@@ -1279,13 +1363,43 @@
           li.addEventListener('pointerdown', function (e) { e.preventDefault(); pickName(n); });
           drop.appendChild(li);
         });
+        /* build 127, ON THE STORE: a name that is not on the list is not kept as typed. He picks a listed
+           company, or sends the name to the admin for approval; after three wrong spellings, he cannot. */
+        /* no list yet: the line under the field says so, once (the same words in this box read twice) */
+        if (STORE && loading) { drop.hidden = true; inp.setAttribute('aria-expanded', 'false'); return; }
+        if (STORE && !loading && typed.length >= 2 && !listed(typed)) {
+          if (MM.auth.mayPropose()) {
+            var add = el('li', 'q-who-item q-who-new');
+            add.setAttribute('role', 'option');
+            add.appendChild(el('span', null, t('Not on the list? Send “{typed}” to the admin for approval', { typed: typed })));
+            add.addEventListener('pointerdown', function (e) { e.preventDefault(); proposeName(typed); });
+            drop.appendChild(add);
+          } else {
+            drop.appendChild(el('li', 'q-who-none', t('“{typed}” is not on the company list. Choose a listed company, or ask the admin to add it.', { typed: typed })));
+          }
+        }
         if (phone) {
           var room = (vv ? vv.height : root.innerHeight) - 200;
           drop.style.maxHeight = Math.max(150, Math.min(380, room)) + 'px';
         }
         drop.hidden = false; inp.setAttribute('aria-expanded', 'true');
       }
+      function listed(typed) {
+        var want = String(typed || '').trim().toLowerCase(), i;
+        for (i = 0; i < names.length; i++) if (String(names[i]).trim().toLowerCase() === want) return names[i];
+        return null;
+      }
+      function sayNew() {
+        newNote.hidden = !fresh;
+        if (fresh) newNote.textContent = t('“{name}” goes to the admin for approval. If it is a listed company spelled differently, it counts against you: {n} of 3 so far.', { name: fresh, n: MM.auth.wrongNames() });
+      }
+      function proposeName(n) {
+        fresh = n; inp.value = n; hi = -1; paintDrop(false); sayNew(); check();
+        picking(false);
+        if (phone) inp.blur();
+      }
       function pickName(n) {
+        fresh = null; sayNew();
         inp.value = n; hi = -1; paintDrop(false); check();
         picking(false);                      /* the whole card comes back, with Continue */
         if (phone) inp.blur();               /* and the keyboard goes */
@@ -1293,7 +1407,7 @@
       inp.addEventListener('focus', function () { picking(true); paintDrop(true); });
       inp.addEventListener('click', function () { picking(true); paintDrop(true); });   /* a tap on a field that already has focus */
       /* the best match is lit as you type, so Enter / Go picks it */
-      inp.addEventListener('input', function () { picking(true); hi = inp.value.trim() ? 0 : -1; paintDrop(true); });
+      inp.addEventListener('input', function () { if (fresh !== null && inp.value.trim() !== fresh) { fresh = null; sayNew(); } picking(true); hi = inp.value.trim() ? 0 : -1; paintDrop(true); });
       inp.addEventListener('blur', function () { setTimeout(function () { paintDrop(false); picking(false); }, 120); });
       inp.addEventListener('keydown', function (e) {
         var m = matches();
@@ -1323,14 +1437,19 @@
         audience = a;
         [].forEach.call(opts.children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.a === a)); });
         co.hidden = a !== 'broker';
-        if (a === 'broker' && !inp.value && !asked) inp.value = (last && last.audience === 'broker' && last.company) || '';
+        if (a === 'broker' && !inp.value && !asked) {
+          inp.value = (last && last.audience === 'broker' && last.company) || '';
+          /* the company he proposed a moment ago is still the one he is sending to */
+          if (STORE && !loading && last && last.isNew && inp.value && !listed(inp.value) && MM.auth.mayPropose()) { fresh = inp.value; sayNew(); }
+        }
         if (!fmtPicked) setFormat(a === 'broker' ? 'pdf' : 'post', false);
         check();
       }
       function check() {
         var waitPdf = pending && format === 'pdf';
         go2.textContent = waitPdf ? t('Preparing the offer PDF…') : format === 'post' ? t('Make the post') : t('Continue to WhatsApp');
-        go2.disabled = waitPdf || !audience || !format || (audience === 'broker' && !inp.value.trim());
+        go2.disabled = waitPdf || !audience || !format || (audience === 'broker' && !inp.value.trim()) ||
+          (STORE && audience === 'broker' && !listed(inp.value) && fresh !== inp.value.trim());
       }
       inp.addEventListener('input', check);
       function close() {
@@ -1345,18 +1464,34 @@
       dim.addEventListener('click', close);
       document.addEventListener('keydown', onKey);
       go2.addEventListener('click', function () {
-        var who = { audience: audience, company: audience === 'broker' ? inp.value.trim() : null, format: format };
+        var who = { audience: audience, company: audience === 'broker' ? (STORE && listed(inp.value)) || inp.value.trim() : null, format: format };
+        if (STORE && audience === 'broker' && !listed(inp.value)) who.isNew = true;
         /* a post-only send does not change how the next single offer is sent */
-        var keep = postOnly ? { audience: who.audience, company: who.company, format: (last && last.format) || null } : who;
+        var keep = postOnly ? { audience: who.audience, company: who.company, isNew: who.isNew, format: (last && last.format) || null } : who;
         try { sessionStorage.setItem(AUD_KEY, JSON.stringify(keep)); } catch (e) {}
         close();
         then(who);
       });
 
+      if (loading) {
+        MM.auth.loadCompanies().then(function (a) {
+          loading = false;
+          setNames(a.map(function (b) { return b.name; }).filter(Boolean));
+          if (listNote) listNote.hidden = true;
+          if (document.activeElement === inp) paintDrop(true);
+          check();
+        }, function () {
+          /* `loading` stays on: nothing is sent for approval against a list that never came */
+          if (listNote) listNote.textContent = t('The companies could not be loaded. Check your connection, then open this again.');
+          if (document.activeElement === inp) paintDrop(true);
+        });
+      }
+
       /* not in the demo (a request on its lock screen): Watch it must always get the PDF */
       if (postOnly) setFormat('post', true);
       else if (last && last.format && !asked) setFormat(last.format, true);
-      if (last && !asked) choose(last.audience); else check();
+      if (forAgent) choose('broker');
+      else if (last && !asked) choose(last.audience); else check();
       document.body.appendChild(box);
       void box.offsetWidth;
       box.classList.add('in');

@@ -14,12 +14,25 @@ const CONFIG = {
   /* Bumped on every deploy, and matched by the ?v= on every script tag in
      the HTML. That pair is what stops a returning phone running yesterday's
      JavaScript. See README, "Deploying". */
-  build: 121,
+  build: 147,
 
   /* Where the activity log is sent. Empty = kept on the device only, which
      is where it is today. Filling this in is the whole change when the
      database is stood up. */
   activity: { url: '', key: '' },
+
+  /* THE SALES AGENT'S DAY (build 134). Muhanad, 2026-10-07: an agent's daily duty is "at least 3
+     offers" sent as a general broadcast to all the brokerage companies. My activity shows today's
+     count against it, one line under his sales. Remove the number and the line goes. */
+  salesDay: { broadcasts: 3 },
+
+  /* THE SALES AGENT'S WEEK ("The week" card on Team Pulse). Muhanad, 2026-10-11: 10 orientations a
+     week, one number for every sales agent; every visit counts. The week is Saturday to Thursday, so
+     the week's broadcasts are salesDay.broadcasts times six. Remove the number and the card and its
+     line on Home go. */
+  salesWeek: { orientations: 10 },
+
+  /* the demo: no store on this link */
 
   company: {
     name:    'MAIN MARKS',
@@ -859,14 +872,20 @@ const CONFIG = {
          confirmed. Turn it off the day they do. */
       post: { sample: true },
       offer: {
-        scope: { types: ['Clinic'], floors: ['first'], buildings: ['E02'] },
+        /* build 126: the second floor of Building E is in (Muhanad, 2026-10-07: "finalize Moray Wellness building E").
+           A floor is in scope when it has all three: its plan and its building plate below (`art`), and its
+           units traced (`unitShapes`). */
+        scope: { types: ['Clinic'], floors: ['first', 'second'], buildings: ['E02'] },
         art: {
           render:     'img/moray-line-wellness-render.jpg',   /* Wellness CI p.10, the placed image */
           logoWhite:  'img/pdf/wellness-white.png',           /* CI p.11 */
           logoOrange: 'img/pdf/wellness-orange.png',          /* CI p.11 */
           mainMarks:  'img/mainmarks-wordmark.png',
-          plates:     { 'E02': { first: 'img/pdf/plate-E02-first.jpg' } },
-          floors:     { first: 'img/pdf/plan-first.jpg' },    /* brochure PDF p.20 */
+          /* JPEG copies of img/moray-plate-*.webp and img/moray-plan-*.webp (jsPDF takes no WebP), flattened
+             on white, the plan at the same pixel size so `plates` and `unitShapes` fit unchanged */
+          plates:     { 'E02': { first: 'img/pdf/plate-E02-first.jpg', second: 'img/pdf/plate-E02-second.jpg' } },
+          floors:     { first: 'img/pdf/plan-first.jpg',     /* brochure PDF p.20 */
+                        second: 'img/pdf/plan-second.jpg' }, /* brochure PDF p.21 */
           /* build 79: the project and the building. Every render is Main Marks' own,
              copied out of the Moray brochure with pdfimages -j, NOT re-encoded. */
           street:     'img/moray-render.jpg',                 /* PDF p.12 (no heading on the page) */
@@ -880,7 +899,10 @@ const CONFIG = {
            drawn at slightly different scales. Lined up by their site outlines
            (alpha masks, overlap 99.2%): master px = s * first-floor px + (tx, ty).
            So a building cut on the floor plan (`plates`) is found on the master plan. */
-        masterFromFloor: { s: 0.98989, tx: 16.04, ty: 16.16 },
+        /* build 126: the fit was measured on the FIRST-floor drawing (`floor`). Another floor's drawing sits
+           on a different canvas, so a building is found on the master plan through its first-floor cut:
+           the same building, the same size, at that drawing's own offset (js/pdf.js, js/post.js). */
+        masterFromFloor: { s: 0.98989, tx: 16.04, ty: 16.16, floor: 'first' },
         /* The project in the brochure's own figures and words (PDF p.14, p.37) */
         /* `smallAr` / `clinicQuoteAr` (build 80): there is NO Arabic Moray
            brochure, so these are OUR translations of its English, marked as such
@@ -992,7 +1014,12 @@ const CONFIG = {
          `discount` is the plan's own; the price it applies to is the
          sheet's live price. `until` ends the offer by itself: after that
          date the plan is not offered at all. `notFor` = unit types the
-         plan does not apply to ("does NOT apply to commercial units"). */
+         plan does not apply to ("does NOT apply to commercial units").
+         build 141: A PLAN STAYS IN THIS LIST AFTER ITS `until` HAS PASSED. The offer pages stop
+         showing it by themselves; the contract form (MM.contractPlan, js/auth.js) still lists it,
+         because a contract can be signed later on a reservation made during the offer (Muhanad,
+         2026-10-11). And an `id` is never given to a different plan later: contracts are saved
+         under it. */
       plans: [
         { id: 'o0-8',  group: 'offer', label: '0% down · 8 years',                down: 0,    years: 8,  every: 3, until: '2026-10-15', notFor: ['Commercial'] },
         { id: 'o20-8', group: 'offer', label: '20% down · 8 years · 10% off',     down: 0.20, years: 8,  every: 3, discount: 0.10, until: '2026-10-15', notFor: ['Commercial'] },
@@ -1022,9 +1049,10 @@ const CONFIG = {
          (Desktop\Moray - Main Marks\05 Sales & pricing\Broker company.xlsx, rows 1-76,
          in their order and spelling; only stray spaces tidied). Feeds "Who is this
          offer for?" (build 88; Muhanad: "add all the brokerage company list").
-         THE PUBLIC DEMO LINK carries only a 7-name sample: scripts/make-demo-publish.js
-         cuts this list between the two markers (his choice, 2026-10-03; the contract
-         promises the broker list is never disclosed). */
+         NEVER PUBLISHED AS IT STANDS HERE (Muhanad, 2026-10-07, "hide on both": the
+         contract promises the broker list is never disclosed, and a published file is
+         readable without signing in). The publish scripts cut this list between the two
+         markers: the real app takes the companies from the store after sign-in. */
       brokerages: /* BROKERAGES:START (demo sample) */ ['Views', 'Nawy', 'High Level', 'Market Standerd', 'Twelve Real Estate', 'We Prime', 'Redz Investment', 'السقا', 'Real Challenge', 'Shortcut', 'Th', 'coldwell banker', 'New Avenue', 'The Address Investment', 'Real Chance', 'curve', 'Westse', 'M I Invest', 'sokin', 'AMG', 'everscopes', 'الدجوي', 'connect homes', 'the lark group', 'silverline', 'Millers', 'Aqar gold', 'B2B', 'seen', 'OMD', 'limitless', 'Equal Estate', 'white Line', 'sodik home', 'PRO TITANIUM GROUP', 'Bold Routes', 'المراد للتسويق العقاري', 'Wealth', 'HOPE', 'Free Brokers', 'Isola Vista', 'Insider', 'Veterans', 'Crete investment', 'Hello Deal', 'Special Key', 'Regor', 'Y the brokers', 'Investa', 'Sand Stone', 'ElHelmy', 'ALQODS القدس', 'Element', 'KHL', 'Red Hills', 'Places', 'Fav Deal', 'Frensh House', 'DRI', 'Luxury Housing', 'The House', 'A PLUS', 'Top Managment', 'Setaj', 'AK', 'The Land', 'We state', 'NOD', 'The Trust', 'Pharaohs', 'Elkarma', 'GIG', 'Smart Property', 'Irtkaz', 'Neo Gen Royal', 'Eska- the stone'] /* BROKERAGES:END */,
       source:  'Moray brochure (Digital Brochure, Oct 2025)',
 
@@ -1052,12 +1080,9 @@ const CONFIG = {
      never be mistaken for somebody's real account. The name is accepted
      too, because a salesperson handed a phone will type that.        */
   users: [
-    /* DEMOUSERS:START  the two demo accounts that sign in as real people: the salesperson is a member of
-       the team below (found by `staff`, so My activity is hers), the manager is its manager.
-       scripts/make-demo-publish.js rewrites these two lines unless it is run with --manager=real. */
-    { id: 'demo-sales',    name: 'Nada Osama',         email: 'sales@demo.local',    role: 'sales',         code: '1111', staff: 'MMD219', projects: ['moray', 'hrs'], phone: '' },
-    { id: 'demo-manager',  name: 'Mina Magdy',         email: 'manager@demo.local',  role: 'sales_manager', code: '2222', projects: ['moray', 'hrs'], phone: '' },
-    /* DEMOUSERS:END */
+    /* the demo accounts, under stand-in names on this link */
+    {"id":"demo-sales","name":"Demo Salesperson 6","email":"sales@demo.local","role":"sales","code":"1111","projects":["moray","hrs"],"phone":"","staff":"DEMO-06"},
+    {"id":"demo-manager","name":"Demo Sales Manager","email":"manager@demo.local","role":"sales_manager","code":"2222","projects":["moray","hrs"],"phone":""},
     { id: 'demo-director', name: 'Demo Director',      email: 'director@demo.local', role: 'director',      code: '3333', projects: ['moray', 'hrs'], phone: '' }
   ],
   usersDemo: true,
@@ -1072,25 +1097,16 @@ const CONFIG = {
      --manager=real, and refuses to finish if a name or code is still in it.
      Ask Muhanad before real names go on a public link. Without this block the
      app has no manager view: sign-in and the header check for it. */
-  /* SALESTEAM:START */
-  salesTeam: {
-    manager: { name: 'Mina Magdy', title: 'Sales Manager', code: 'MMD031', reportsTo: 'Sherif Essam', reportsTitle: 'Sales Director' },
-    members: [
-      { name: 'Mereham Ayman',        title: 'Assistant Sales Manager',    code: 'MMD155' },
-      { name: 'Nouran Hany',          title: 'Sales Supervisor',           code: 'MMD188' },
-      { name: 'Fady Hany',            title: 'Sales Supervisor',           code: 'MMD168' },
-      { name: 'Ahmed Hussein',        title: 'Senior Property Consultant', code: 'MMD193' },
-      { name: 'Abd el-Rahman Fathi',  title: 'Senior Property Consultant', code: 'MMD218' },
-      { name: 'Nada Osama',           title: 'Senior Property Consultant', code: 'MMD219' },
-      { name: 'Rojan Osama',          title: 'Senior Property Consultant', code: 'MMD241' }
-    ]
-  },
-  /* SALESTEAM:END */
+  /* stand-in names: the real team is not on this link */
+  salesTeam: {"manager":{"name":"Demo Sales Manager","title":"Sales Manager","code":"DEMO-00","reportsTo":"Demo Sales Director","reportsTitle":"Sales Director"},"members":[{"name":"Demo Salesperson 1","title":"Assistant Sales Manager","code":"DEMO-01"},{"name":"Demo Salesperson 2","title":"Sales Supervisor","code":"DEMO-02"},{"name":"Demo Salesperson 3","title":"Sales Supervisor","code":"DEMO-03"},{"name":"Demo Salesperson 4","title":"Senior Property Consultant","code":"DEMO-04"},{"name":"Demo Salesperson 5","title":"Senior Property Consultant","code":"DEMO-05"},{"name":"Demo Salesperson 6","title":"Senior Property Consultant","code":"DEMO-06"},{"name":"Demo Salesperson 7","title":"Senior Property Consultant","code":"DEMO-07"}]},
 
   roles: {
-    sales:         { label: 'Salesperson',   canOffer: true,  canSeeTeam: false, canSeeAll: false },
+    sales:         { label: 'Sales agent',   canOffer: true,  canSeeTeam: false, canSeeAll: false },
     sales_manager: { label: 'Sales manager', canOffer: true,  canSeeTeam: true,  canSeeAll: false },
-    director:      { label: 'Director',      canOffer: true,  canSeeTeam: true,  canSeeAll: true }
+    director:      { label: 'Director',      canOffer: true,  canSeeTeam: true,  canSeeAll: true },
+    /* build 123: the admin looks after the accounts and the company list (admin.html). The store only:
+       there is no demo admin. He does not send offers. */
+    admin:         { label: 'Admin',         canOffer: false, canSeeTeam: false, canSeeAll: true }
   }
 };
 

@@ -395,6 +395,17 @@ body.is-login { min-height: 100svh; }
   justify-self: start;
 }
 .forgot:hover { color: var(--orange); }
+/* build 122: choosing your own password, in the sign-in form's own pieces */
+/* a hidden piece of the form is gone: the fields and the button carry their own display, which beats [hidden] */
+.gate-form [hidden] { display: none !important; }
+.newpw { display: grid; }
+.newpw[hidden] { display: none; }
+.newpw-h { margin: 0 0 18px; color: var(--white); font: 400 17px/1.3 var(--font-corporate); }
+.newpw .field + .field { margin-top: 16px; }
+.newpw-h:has(+ .newpw-rule) { margin-bottom: 4px; }   /* build 146: the rule sits under the heading */
+.newpw-rule { margin: 0 0 18px; }
+.newpw .signin-btn { margin-top: 22px; }
+.who-pw { display: block; text-decoration: none; margin-bottom: 10px; }
 .forgot-note {
   margin-top: 8px;
   font-family: var(--font-utility);
@@ -1184,6 +1195,9 @@ body.is-login { min-height: 100svh; }
   }
   .is-chooser .pick-foot .marks > img { height: 14px; }
   .is-chooser .pick-foot .gate-priv { text-align: right; font-size: 8.5px; line-height: 1.25; gap: 0; }
+  /* build 127: the bar is on this page too, and its plus sits over the end of this one-row footer;
+     the row stops short of it, on whichever side the plus is */
+  .is-chooser.has-sp-bar .pick-foot { padding-inline-end: 64px; }
   .chooser .l-card { flex: 0 0 72%; scroll-snap-align: center; }
   /* THE SWIPE. --f is how far a card is from the centre, 0 (centred) to 1
      (a card's width away), written on every scroll frame by scrollLights.
@@ -2046,6 +2060,13 @@ body.is-login { min-height: 100svh; }
    that could be half-applied at a hand-over. */
 .markbuild.is-lit { opacity: 1; }
 
+/* build 130: what glows by itself on the page (the roofs that breathe, the best-fit unit) stands still
+   while the logo plays over it. Nobody can see it under the black, and each of its frames is drawn by
+   the page, which is busy enough then. It goes on from where it stopped when the black has gone. */
+.mb-running .lp-roof,
+.mb-running .q-u,
+.mb-running .q-u-glow { animation-play-state: paused; }
+
 /* will-change only while it is actually moving */
 .mb-running .mb-part,
 .mb-running .mb-ink,
@@ -2222,7 +2243,8 @@ body.is-login { min-height: 100svh; }
    in from opposite ends. */
 .mb-stage.mb-word2 { top: 38%; }
 .mb-tag.mb-tag2 { top: 55%; }
-.mb-script { will-change: clip-path; }
+/* build 130: the script row is written on by two transforms (js/markbuild.js), no longer a clip-path;
+   its will-change is the .mb-part and .mb-glyph rules above */
 .mb-bar { position: absolute; top: 0; bottom: 0; width: clamp(18px, 7.7vw, 40px); }
 .mb-bar-l { left: 0; transform-origin: 50% 0; }
 .mb-bar-r { right: 0; transform-origin: 50% 100%; }
@@ -2758,6 +2780,8 @@ body.is-ready .mv-hint { opacity: 1; }
 .q-cta:disabled { opacity: .5; cursor: default; }
 .q-cta:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
 .q-note { font-size: 12.5px; color: var(--q-dim); }
+/* build 134: what the store counted for the offer PDF just sent, on its own line under the note */
+.q-counted { flex-basis: 100%; color: var(--white); font-weight: 600; }
 /* build 84: who is this offer for, asked before every offer leaves the app */
 .q.q-who { position: fixed; inset: 0; z-index: 60; padding: 0; display: flex; align-items: flex-end; justify-content: center; }
 .q-who-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .6); opacity: 0; transition: opacity .25s ease; }
@@ -2835,6 +2859,9 @@ body.is-ready .mv-hint { opacity: 1; }
 .q-post-acts .q-ghost { min-height: 48px; }
 .q-post-note { margin: 10px 0 0; }
 .q-post-note:empty { display: none; }
+/* build 129: how many times this broadcast has been sent, under the buttons (js/post.js). White, not
+   green: green already means "best fit" in this app. */
+.q-post-sent { margin: 12px 0 0; font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--white); }
 .q-assume { margin: 18px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.55; color: var(--q-faint); }
 .q-empty { margin-top: 14px; font-size: 13.5px; color: var(--q-dim); }
 .q-src { margin-top: 26px; }
@@ -3304,11 +3331,11 @@ body.is-ready .mv-hint { opacity: 1; }
 @media (max-width: 480px) { .mode-switch { padding: 0 9px; } .mode-switch span { display: none; } }
 @media (prefers-reduced-motion: reduce) { .st-gauge .g-arc, .st-gauge .g-beat, .st-step.is-lit .st-node { animation: none; } }
 
-/* ---- build 121: a salesperson's bar on the projects page ----------------
+/* ---- build 121: a sales agent's bar; on every page since build 127 ------
    The floating bar and the round plus of "My activity" (css/manager.css,
-   .tab and .fab), repeated here because this page does not load that
+   .tab and .fab), repeated here because these pages do not load that
    sheet. `sp-` on purpose: a plain .tab or .fab could meet a rule already
-   in this file. Shown only to a salesperson on the team (js/app.js). */
+   in this file. Shown only to a sales agent (MM.salesBar in js/brand.js). */
 .sp-bar { position: fixed; z-index: 40; left: max(12px, calc(50% - 228px)); right: max(12px, calc(50% - 228px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(3, 1fr); padding: 6px; border-radius: 24px; border: 1px solid rgba(247, 149, 30, .18); background: #17110c; box-shadow: 0 -18px 30px 6px #000, 0 22px 0 14px #000; font-family: Manrope, system-ui, sans-serif; }
 .sp-bar a { display: grid; justify-items: center; gap: 3px; padding: 6px 0; min-width: 0; font-size: 10px; font-weight: 600; line-height: 1.3; letter-spacing: 0; color: #a39a92; text-decoration: none; border-radius: 14px; position: relative; }
 .sp-bar svg { width: 22px; height: 22px; }
@@ -3316,8 +3343,19 @@ body.is-ready .mv-hint { opacity: 1; }
 .sp-bar a[aria-current="page"] svg { filter: drop-shadow(0 0 8px rgba(247, 149, 30, .8)); }
 .sp-bar a[aria-current="page"]::before { content: ""; position: absolute; top: 1px; width: 18px; height: 3px; border-radius: 2px; background: #F7951E; box-shadow: 0 0 10px rgba(247, 149, 30, .9); }
 .sp-bar a:focus-visible, .sp-fab:focus-visible { outline: 2px solid #F7951E; outline-offset: 2px; }
+/* build 132: tapped, the heartbeat draws itself again while My activity opens on the pulse */
+.sp-bar a.beat svg path { stroke-dasharray: 40; animation: sp-beat .6s cubic-bezier(.4, 0, .2, 1) both; }
+@keyframes sp-beat { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .sp-bar a.beat svg path { animation: none; } }
 .sp-fab { position: fixed; z-index: 41; inset-inline-end: max(16px, calc(50% - 224px)); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #F7951E; color: #000; box-shadow: 0 8px 26px rgba(247, 149, 30, .4); }
 .sp-fab svg { width: 20px; height: 20px; }
 html[lang="ar"] .sp-bar { font-family: "IBM Plex Sans Arabic", Manrope, Tahoma, sans-serif; }
 /* room under the page so the footer is never behind the bar */
 body.has-sp-bar { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
+/* build 127: the black around the bar is the page's own ground carried up to it, which is right while
+   the bar spans the screen. On a wide screen the bar is a short pill, and over a picture that black
+   read as a blot (seen on a product page at laptop width): there it is an ordinary shadow. */
+@media (min-width: 600px) { .sp-bar { box-shadow: 0 12px 32px rgba(0, 0, 0, .65); } }
+
+/* build 127: "not on the list? send it to the admin" in the company list */
+.q-who-item.q-who-new { color: var(--orange); font-weight: 600; border-top: 1px solid rgba(255, 255, 255, .14); }

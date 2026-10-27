@@ -301,8 +301,9 @@
     menu.hidden = true;
     menu.appendChild(el('p', 'who-n', name));
     if (o.role) menu.appendChild(el('p', 'who-r', o.role));
-    /* build 115: a sales manager's way from the sales app to his team (manager.html) */
-    if (session && session.role === 'sales_manager' && CONFIG.salesTeam && !o.noMode && box.parentNode && !box.parentNode.querySelector('.mode-switch')) {
+    /* build 115: a sales manager's way from the sales app to his team (manager.html).
+       build 135: on the store as well, where the team is in the database, not in the settings file. */
+    if (session && session.role === 'sales_manager' && (session.real || CONFIG.salesTeam) && !o.noMode && box.parentNode && !box.parentNode.querySelector('.mode-switch')) {
       var team = el('a', 'mode-switch');
       team.href = 'manager.html';
       team.setAttribute('aria-label', t('Team Pulse'));
@@ -310,6 +311,12 @@
       team.appendChild(el('span', null, t('Team Pulse')));
       box.parentNode.insertBefore(team, box);
       box.parentNode.classList.add('has-mode');
+    }
+    /* build 122: on the store, a person can choose a new password whenever he likes */
+    if (session && session.real) {
+      var pw = el('a', 'who-out who-pw', t('Change password'));
+      pw.href = 'login.html?change=1';
+      menu.appendChild(pw);
     }
     var out = el('button', 'who-out', t('Sign out'));
     out.type = 'button';
@@ -328,9 +335,112 @@
     box.appendChild(menu);
   }
 
+  /* ---- a sales agent's bar (build 121; on every page since build 127) ---
+     The same floating bar as on "My activity" (my.html), so the pages read
+     as one app: Quick Offer (the sales app), My activity, Profile, and the
+     round plus that records an orientation, a workshop, a meeting, a
+     reservation or a contract. Only for a sales agent who has a My activity
+     (MM.auth.member): a manager has Team Pulse, and a copy published
+     without the team has no My activity to go to.
+
+     Build 121 drew it on the projects page only. Muhanad, 2026-10-07: it is
+     on EVERY page, because inside a project a sales agent had to go back to
+     the first page to reach My activity or the plus. Written once here and
+     called by each page, so the pages cannot drift apart. */
+  function salesBar() {
+    if (!MM.auth || MM.auth.member() === -1 || document.querySelector('.sp-bar')) return;
+    var icon = function (d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>'; };
+    var bar = el('nav', 'sp-bar');
+    bar.setAttribute('aria-label', t('Sections'));
+    [['projects.html', '<path d="M21 3L10 14M21 3l-6.5 18-4.5-7-7-4.5z"/>', t('Quick Offer'), true],
+      ['my.html', '<path d="M3 12h4l2.5-7 4 14 2.5-7h5"/>', t('My activity')],
+      ['my.html#profile', '<circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c0-4 3.4-6.5 7.5-6.5s7.5 2.5 7.5 6.5"/>', t('Profile')]].forEach(function (x) {
+      var a = el('a');
+      a.href = x[0];
+      if (x[3]) a.setAttribute('aria-current', 'page');
+      a.innerHTML = icon(x[1]);
+      a.appendChild(el('span', null, x[2]));
+      /* build 132: the heartbeat draws itself again under the thumb, and My activity opens on the pulse */
+      if (x[0] === 'my.html') a.addEventListener('click', function () { a.classList.remove('beat'); void a.offsetWidth; a.classList.add('beat'); });
+      bar.appendChild(a);
+    });
+    var plus = el('a', 'sp-fab');
+    plus.href = 'my.html#record';
+    plus.setAttribute('aria-label', t('Record an orientation, a workshop, a meeting, a reservation or a contract'));
+    plus.innerHTML = icon('<path d="M12 5v14M5 12h14"/>');
+    document.body.appendChild(bar);
+    document.body.appendChild(plus);
+    document.body.classList.add('has-sp-bar');
+    /* build 132: My activity is one tap from every page, and it opens on the pulse. With its files
+       already on the phone the pulse starts at once; on a slow line it would otherwise be seconds of
+       the page before. warmNext is declared below and waits for this page to be idle. */
+    warmNext('my.html', []);
+  }
+
+  /* ---- the next page, in hand before the tap (build 130) ---------------
+     Every page of this app is its own document, so a tap is a trip to the host for the page, its
+     scripts and its pictures. On a slow line that is seconds of black before anything moves: measured
+     on 2026-10-07 at about two seconds a request. The host lets a phone keep each file for ten
+     minutes. So the page the person is LOOKING at asks, quietly and one file at a time, for what the
+     next tap will need, and the tap then finds it all on the phone.
+
+       href      the page the tap will open, exactly as the link writes it
+       pictures  what that page shows first
+
+     Only this app's own files, only once this page has finished loading and the browser is idle,
+     never on a phone set to save data. A failure is nothing: the next page asks for itself, as before.
+     It asks for the SAME addresses the page will (the ?v= stamps included), so nothing stale can be
+     kept: a new build has new addresses. */
+  var warmed = {};
+  function warmNext(href, pictures) {
+    if (typeof document === 'undefined' || !root.fetch || !href || warmed[href]) return;
+    var c = root.navigator && root.navigator.connection;
+    if (c && c.saveData) return;
+    warmed[href] = true;
+    var start = function () {
+      var queue = [], seen = {};
+      /* what this page itself loaded is on the phone already: asking again would only cost frames */
+      Array.prototype.forEach.call(document.querySelectorAll('script[src], link[rel="stylesheet"][href]'), function (n) {
+        seen[n.getAttribute('src') || n.getAttribute('href')] = true;
+      });
+      var one = function () {
+        var u = queue.shift();
+        if (!u) return;
+        var next = function () { setTimeout(one, 40); };
+        if (/\.(png|jpe?g|webp|svg|gif)(\?|$)/i.test(u)) {
+          var im = new Image();
+          im.onload = im.onerror = next;
+          im.src = u;
+        } else {
+          root.fetch(u, { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(next, next);
+        }
+      };
+      root.fetch(href, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (html) {
+        (html.match(/(?:src|href)="(?:js|css|vendor)\/[^"]+"/g) || []).forEach(function (m) {
+          var u = m.replace(/^(?:src|href)="/, '').replace(/"$/, '');
+          if (!seen[u]) { seen[u] = true; queue.push(u); }
+        });
+        (pictures || []).forEach(function (u) {
+          if (u && /^img\/[A-Za-z0-9._\/-]+$/.test(u) && !seen[u]) { seen[u] = true; queue.push(u); }
+        });
+        one();
+      }).catch(function () { /* the next page asks for itself */ });
+    };
+    var idle = function () {
+      if (root.requestIdleCallback) root.requestIdleCallback(start, { timeout: 3000 });
+      else setTimeout(start, 1200);
+    };
+    var go = function () { if (document.readyState === 'complete') idle(); else root.addEventListener('load', idle); };
+    /* never under the entry animation: measured, each file asked for then cost it a frame. It waits
+       for the black to go (MM.markbuild.after runs it at once on a page that has no black). */
+    if (MM.markbuild && MM.markbuild.after) MM.markbuild.after(go); else go();
+  }
+
   MM.el = el;
   MM.t = t;
   MM.whoMenu = whoMenu;
+  MM.salesBar = salesBar;
+  MM.warmNext = warmNext;
   MM.project = project;
   MM.sellableProject = sellableProject;
   MM.applyBrand = applyBrand;

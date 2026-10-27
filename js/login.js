@@ -13,6 +13,15 @@
   var MM = window.MM, el = MM.el, t = MM.t;
   MM.applyBrand();
 
+  /* build 124: the store is the app. login.html?store=demo switches this one browser to the demo
+     accounts and the demo book (for a pitch), and login.html?store=real switches it back. */
+  (function () {
+    var want = new URLSearchParams(location.search).get('store');
+    try { if (want === 'demo') localStorage.setItem('mm.store', 'demo'); else if (want === 'real') localStorage.removeItem('mm.store'); } catch (e) { /* stays as it was */ }
+  }());
+  var REAL = MM.auth.real();
+  var CHANGE = REAL && new URLSearchParams(location.search).get('change') === '1';
+
   /* ---- the entrance ---------------------------------------------------
      One class, set immediately. Every animation it starts carries
      fill-mode `both`, so it holds its own start state and cannot leave
@@ -32,13 +41,18 @@
     var me = MM.auth.current();
     /* build 120: only where the manager view is set up (CONFIG.salesTeam). A copy published without it
        has no start.html, and a manager must land on the projects, not on a missing page. */
-    if (!raw) return me && me.role === 'sales_manager' && CONFIG.salesTeam ? 'start.html' : 'projects.html';
+    if (CHANGE) raw = '';
+    if (me && me.role === 'admin') return 'admin.html';
+    /* build 124 sent a manager on the store straight to the sales app, because Team Pulse still drew the
+       demo book. build 135: Team Pulse reads the store, so he lands on "Lead or sell?" there as well. */
+    if (!raw) return me && me.role === 'sales_manager' && (REAL || CONFIG.salesTeam) ? 'start.html' : 'projects.html';
     if (/^[a-z0-9\-]+\.html(\?[^#]*)?$/i.test(raw)) return raw;
     return 'projects.html';
   }
 
   /* Already signed in? Then this page has nothing to ask. */
-  if (MM.auth.current()) { location.replace(nextPage()); return; }
+  if (MM.auth.current() && !CHANGE) { location.replace(nextPage()); return; }
+  if (CHANGE && !MM.auth.current()) { location.replace('login.html'); return; }
 
   var form = document.getElementById('signin');
   var who = document.getElementById('who');
@@ -52,7 +66,7 @@
   var forgot = document.getElementById('forgot');
   var forgotNote = document.getElementById('forgotnote');
   forgot.addEventListener('click', function () {
-    forgotNote.textContent = t('Your sales manager resets it. Nothing is emailed from this app.');
+    forgotNote.textContent = REAL ? t('The admin resets it and gives you a new one. Nothing is emailed from this app.') : t('Your sales manager resets it. Nothing is emailed from this app.');
     forgotNote.hidden = false;
   });
 
@@ -60,7 +74,7 @@
      Only while the team list in config is the placeholder one. It
      disappears on its own the moment the real list replaces it. */
   var note = document.getElementById('demonote');
-  if (note && CONFIG.usersDemo) {
+  if (note && CONFIG.usersDemo && !REAL) {
     note.hidden = false;
     var list = el('div', 'demo-accounts');
     (CONFIG.users || []).forEach(function (u) {
@@ -88,15 +102,75 @@
   var sweep = document.querySelector('.gate-sweep');
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  function busy(on) {
+    go.classList.toggle('is-loading', on);
+    go.disabled = on;
+    form.classList.toggle('is-busy', on);
+    if (on && sweep) {
+      sweep.classList.remove('is-lit');
+      void sweep.offsetWidth;          /* restart it */
+      sweep.classList.add('is-lit');
+    }
+  }
+
+  /* ---- choosing your own password (build 122, the store only) --------
+     Offered once, straight after the first sign-in with the password the
+     admin handed over, and whenever the person asks for it from his menu
+     (login.html?change=1). "Not now" is allowed: he keeps the one he has. */
+  var box = document.getElementById('newpw');
+  function askNewPassword(then) {
+    var pw1 = document.getElementById('pw1'), pw2 = document.getElementById('pw2');
+    var pwWhy = document.getElementById('pwwhy'), pwGo = document.getElementById('pwgo');
+    Array.prototype.forEach.call(form.children, function (n) { if (n !== box) n.hidden = true; });
+    box.hidden = false;
+    busy(false);
+    pw1.focus({ preventScroll: true });
+    function bad(msg) { pwWhy.textContent = msg; pwWhy.hidden = false; pwWhy.setAttribute('role', 'alert'); }
+    function save() {
+      pwWhy.hidden = true;
+      /* build 146: the same rule the save keeps (MM.auth.passwordProblem), said before anything is sent */
+      var s = MM.auth.current && MM.auth.current(), why = MM.auth.passwordProblem(pw1.value, s && s.email);
+      if (why) return bad(t(why));
+      if (pw1.value !== pw2.value) return bad(t('The two passwords are not the same.'));
+      pwGo.disabled = true;
+      MM.auth.changePassword(pw1.value).then(function (r) {
+        pwGo.disabled = false;
+        if (!r.ok) return bad(t(r.why));
+        then();
+      });
+    }
+    pwGo.addEventListener('click', save);
+    pw2.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+    document.getElementById('pwskip').addEventListener('click', then);
+  }
+  if (CHANGE) askNewPassword(function () { location.replace(nextPage()); });
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
+    if (!box.hidden) return;
     why.hidden = true;
 
-    /* The sign-in runs FIRST. A refusal must be instant — animating a
-       rejection would make a wrong password feel like a slow network. */
+    /* On the demo accounts the answer is instant, and a refusal must stay
+       instant: animating a rejection makes a wrong password feel like a slow
+       network. On the store the answer takes a moment, so the button turns
+       while it is asked, and a refusal puts it straight back. */
     var r = MM.auth.signIn({ who: who.value, code: code.value });
+    if (r && typeof r.then === 'function') {
+      var asked = Date.now();
+      busy(true);
+      r.then(function (x) {
+        if (!x.ok) { busy(false); fail(t(x.why)); code.select(); return; }
+        if (x.session.mustChange) return askNewPassword(function () { box.hidden = true; accepted(700); });
+        accepted(Date.now() - asked);
+      });
+      return;
+    }
     if (!r.ok) { fail(t(r.why)); code.select(); return; }
+    accepted(0);
+  });
 
+  /* waited: how long the answer already took, so the "verifying" floor is not paid twice */
+  function accepted(waited) {
     var next = nextPage();
     /* the crossing's second line names where it lands */
     var line = document.querySelector('.xf-select');
@@ -123,14 +197,7 @@
        check is instant; when the real back end is stood up this is where
        its answer lands, and the floor keeps the spinner from flickering
        on a fast connection. */
-    go.classList.add('is-loading');
-    go.disabled = true;
-    form.classList.add('is-busy');
-    if (sweep) {
-      sweep.classList.remove('is-lit');
-      void sweep.offsetWidth;          /* restart it */
-      sweep.classList.add('is-lit');
-    }
+    busy(true);
 
     setTimeout(function () {
       go.classList.remove('is-loading');
@@ -146,8 +213,8 @@
            repaints in its own first frame. */
         MM.xfade.cross(function () { location.replace(next); }, next);
       }, 150);
-    }, 700);
-  });
+    }, Math.max(0, 700 - waited));
+  }
 
-  who.focus({ preventScroll: true });
+  if (!CHANGE) who.focus({ preventScroll: true });
 }());

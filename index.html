@@ -588,7 +588,9 @@
 
   function answer() {
     if (lock.classList.contains('away')) return;
-    swGo();                                      /* the stopwatch: from opening the broker's message */
+    /* build 147 (Muhanad, 2026-10-28): the stopwatch runs only when Watch it is playing; a viewer who
+       opens the message himself is not timed, and sees no clock */
+    if (tour) swGo();
     var done = false;
     function unlock() {
       if (done) return;
@@ -1076,7 +1078,7 @@
       .then(function () {
         var ps = q('.q-plansel');
         return show(t, ps).then(function () {
-          return tap(t, ps, function (el) { el.value = 'o30-10'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+          return tap(t, ps, function (el) { el.value = 'p10-8';   /* build 147: a standing plan; the October offer (o30-10) ended on 15 Oct */ el.dispatchEvent(new Event('change', { bubbles: true })); });
         });
       })
       .then(function () { return until(t, function () { return visible(q('.q-sched-wrap')); }, 6000, 'the schedule'); })
@@ -1147,7 +1149,7 @@
      ================================================================== */
   var STEPS = [
     ['The request', 'A broker asks on WhatsApp for a client: the lowest-priced clinic on the 1st floor.'],
-    ['Sign in', 'Each salesperson signs in once, so every offer carries their name.'],
+    ['Sign in', 'Each sales agent signs in once, so every offer carries their name.'],
     ['Project and line', 'Swipe Moray’s lines: each card lights its own buildings on the aerial.'],
     ['Find the unit', 'Find a unit searches Main Marks’ price list. The answer glows on the floor drawing.'],
     ['The payment plan', 'Every figure is worked out from Main Marks’ own plans. Nobody types a number.'],
@@ -1203,6 +1205,7 @@
       sw.querySelector('.sw-best').textContent = best;
       sw.classList.toggle('is-run', swStart != null && swEnd == null);
       sw.classList.toggle('is-done', swEnd != null);
+      sw.style.display = swStart == null ? 'none' : '';   /* build 147: no clock until Watch it starts one */
     });
   }
 
@@ -1215,8 +1218,8 @@
     if (kind === 'demo') {
       $('beatK').textContent = 'The demo’s time';
       $('beatH').textContent = 'The demo sent the offer in ' + swWords(ms) + '.';
-      $('beatP').textContent = 'From opening the broker’s message to the offer in her chat. Can you beat it?';
-      $('beatGo').textContent = 'Try to beat it';
+      $('beatP').textContent = 'From opening the broker’s message to the offer in her chat. Now try it yourself.';
+      $('beatGo').textContent = 'Try it yourself';
     } else if (faster) {
       $('beatK').textContent = 'You beat the demo';
       $('beatH').textContent = swWords(demoTime - ms) + ' faster than the demo.';
@@ -1263,7 +1266,7 @@
     clearTimeout(ringTimer);
     closeAll(true);
     sentDone = false; reached = 0; dlHide(); beatHide();
-    swReset(); swGo();
+    swReset();
     lock.classList.add('away', 'gone');
     screen.classList.remove('locked');
     req.hidden = false;
@@ -1273,6 +1276,11 @@
   try {
     if (window.CONFIG && CONFIG.build) document.getElementById('build').textContent = 'Demo · build ' + CONFIG.build;
   } catch (e) { /* no config: keep the plain line */ }
+  /* build 147: this page loads no config, so the build is read from the app inside the phone */
+  app.addEventListener('load', function () {
+    /* CONFIG is a const in the app, not on its window: the stamp on its config.js address carries the build */
+    try { var sc = app.contentDocument.querySelector('script[src*="config.js"]'), m = sc && /v=(\d+)/.exec(sc.getAttribute('src')); if (m) document.getElementById('build').textContent = 'Demo · build ' + m[1]; } catch (e) { /* not loaded yet */ }
+  });
 }());
 </script>
 </body>

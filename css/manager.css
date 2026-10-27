@@ -47,6 +47,8 @@ button, input, select { font: inherit; }
 .swap svg { width: 13px; height: 13px; color: var(--acc); }
 .swap:hover { border-color: var(--acc); }
 .card > .swap { position: absolute; top: 14px; inset-inline-end: 14px; }
+/* build 135: the profile's name starts under the pill. A real name is longer than the demo's and ran into it. */
+.card > .swap + .me { margin-top: 24px; }
 .hd h1 { margin: 0; font-size: 23px; font-weight: 700; letter-spacing: -.01em; }
 .when { all: unset; box-sizing: border-box; cursor: pointer; justify-self: end; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; padding: 8px 12px; min-height: 36px; border-radius: 999px; background: var(--acc); color: #000; white-space: nowrap; }
 .when svg { width: 14px; height: 14px; }
@@ -182,6 +184,59 @@ button, input, select { font: inherit; }
 .fab { all: unset; box-sizing: border-box; cursor: pointer; position: fixed; z-index: 6; inset-inline-end: calc(var(--side) + 4px); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); height: 52px; width: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--acc); color: #000; box-shadow: 0 8px 26px rgba(247,149,30,.4); }
 .fab svg { width: 20px; height: 20px; }
 
+/* ---- THE PULSE (build 132): what a sales agent sees when he taps the heartbeat ----
+   The manager start page's drawing (css/styles.css, "Team Pulse: the half-dial, a heartbeat through
+   it"): the same arcs, colours and heartbeat, alone on the ember ground, then My activity rises.
+   Markup in my.html; js/manager.js adds the classes:
+     (none)  the first frame: the ground and the empty dial, still. Nothing moves until the page can
+             keep up (the rule of js/markbuild.js).
+     .play   the arcs sweep in one after the other, the heartbeat draws through, the name rises
+     .wait   his figures have not arrived yet: the heartbeat keeps beating until they do
+     .leave  the dial lifts away and the page comes up under it
+     .again  tapped from Profile: it comes in over the page instead of being there from the start
+   It sits over the page and under the bar, so the bar never moves. The page is built while the
+   drawing is at rest, between .play and .leave, never under a moving line.
+   The dial is on a sheet of its own (will-change): its lines are redrawn every frame while they
+   sweep, and without that each redraw also redrew whatever page lay under it. Measured from
+   Profile on a slowed phone: 7 late frames in the sweep before, see the build 132 notes. */
+.pulse-in { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); background: var(--bg); will-change: opacity; }
+.pulse-in.again { animation: piIn .2s ease-out both; }
+.pulse-in.leave { animation: piOut .42s cubic-bezier(.4,0,.2,1) both; }
+@keyframes piIn { from { opacity: 0; } }
+@keyframes piOut { to { opacity: 0; } }
+.pi-wrap { position: relative; display: grid; justify-items: center; gap: 18px; will-change: transform; }
+.pulse-in.leave .pi-wrap { animation: piLift .42s cubic-bezier(.4,0,.2,1) both; }
+@keyframes piLift { to { transform: translateY(-48px) scale(.9); } }
+.pi-halo { position: absolute; left: 50%; top: 46%; width: 280px; height: 280px; margin: -140px 0 0 -140px; border-radius: 50%; background: radial-gradient(closest-side, rgba(247,149,30,.30), transparent); opacity: 0; }
+.pulse-in.play .pi-halo { animation: piHalo 1.1s ease-out .5s both; }
+.pulse-in.play.wait .pi-halo { animation: piHaloWait 1.3s ease-in-out infinite alternate; }
+@keyframes piHalo { 0% { opacity: 0; transform: scale(.7); } 45% { opacity: 1; } 100% { opacity: .35; transform: scale(1.2); } }
+@keyframes piHaloWait { from { opacity: .35; transform: scale(1.2); } to { opacity: .8; transform: scale(1.08); } }
+.pi-dial { width: 224px; height: auto; overflow: visible; display: block; position: relative; direction: ltr; }
+.pi-dial path { fill: none; stroke-linecap: round; }
+.pi-dial .g-track { stroke: var(--never); stroke-width: 12; }
+.pi-dial .g-arc { stroke-width: 12; opacity: 0; }
+.pi-dial .g-a { stroke: var(--good); filter: drop-shadow(0 0 6px rgba(47,191,143,.5)); }
+.pi-dial .g-q { stroke: var(--warn); }
+.pi-dial .g-i { stroke: var(--neut); }
+.pi-dial .g-beat { stroke: var(--acc); stroke-width: 3; stroke-linejoin: round; stroke-dasharray: 100; stroke-dashoffset: 100; filter: drop-shadow(0 0 6px rgba(247,149,30,.7)); }
+.pulse-in.play .g-arc { animation: piSweep .85s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--k) * 120ms + 120ms); }
+.pulse-in.play .g-beat { animation: piBeat .75s cubic-bezier(.45,0,.2,1) .45s both; }
+.pulse-in.play.wait .g-beat { animation: piBeatWait 1.3s ease-in-out infinite; }
+/* his figures came: the line stays whole while the page is built under it */
+.pulse-in.play.wait.rest .g-beat { animation: none; stroke-dashoffset: 0; opacity: 1; }
+@keyframes piSweep { from { stroke-dasharray: 0 629; opacity: 0; } 15% { opacity: 1; } to { opacity: 1; } }
+@keyframes piBeat { to { stroke-dashoffset: 0; } }
+/* waiting: the drawn line fades, then draws itself again */
+@keyframes piBeatWait { 0% { stroke-dashoffset: 0; opacity: 1; } 18% { stroke-dashoffset: 0; opacity: 0; } 19% { stroke-dashoffset: 100; opacity: 0; } 24% { stroke-dashoffset: 100; opacity: 1; } 82%, 100% { stroke-dashoffset: 0; opacity: 1; } }
+.pi-label { margin: 0; position: relative; font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--mut); opacity: 0; }
+.pulse-in.play .pi-label { animation: piLabel .5s cubic-bezier(.2,.8,.2,1) .3s both; }
+@keyframes piLabel { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* the heartbeat on the bar draws itself again as the pulse begins */
+.tab button.beat svg path { stroke-dasharray: 40; animation: tabBeat .6s cubic-bezier(.4,0,.2,1) both; }
+@keyframes tabBeat { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .pulse-in { display: none; } }
+
 /* the sheet: a company, a salesperson, a tile's list, or the record form */
 .veil { position: fixed; inset: 0; z-index: 8; background: rgba(0,0,0,.6); opacity: 0; pointer-events: none; transition: opacity .25s; }
 .veil.on { opacity: 1; pointer-events: auto; }
@@ -261,6 +316,17 @@ html[lang="ar"] .mv-step span { font-size: 10px; }
 
 /* ---- build 121: a salesperson's page (my.html). The same look; these are the pieces only it has. ---- */
 .tab.three { grid-template-columns: repeat(3, 1fr); }
+/* build 123: the admin's page */
+.adm-find input { width: 100%; }
+.adm-flag { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--acc); border: 1px solid var(--edge); border-radius: 999px; padding: 3px 8px; white-space: nowrap; }
+.adm-flag.off { color: var(--mut); }
+.row.gone .val .adm-flag { text-decoration: none; display: inline-block; }
+.adm-link { justify-self: start; }
+.adm-pass { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; align-items: baseline; padding: 14px; border: 1px solid var(--edge); border-radius: 14px; }
+.adm-pass span { font-size: 11.5px; color: var(--mut); }
+.adm-pass b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; user-select: all; }
+.adm-pass b.pw { font-size: 22px; font-weight: 800; letter-spacing: .06em; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.btn.adm-danger { color: var(--bad); border-color: var(--bad); }
 .hd.my .eyebrow { grid-column: 1 / -1; }
 /* My sales: the figure, then the path from request to contract as four bars with their numbers */
 .sales { display: grid; gap: 4px; }
@@ -322,3 +388,284 @@ html[lang="ar"] .sales > b small { margin-inline: 8px 0; }
   .wide .rows > :nth-child(2) { border-top: 0; }
   .tab { box-shadow: 0 18px 40px rgba(0, 0, 0, .6); }
 }
+
+/* ---- build 129: "sent 16 times" on a broadcast explains itself ------------
+   The words are a button; its explanation is the element after it, shown under
+   the row on hover (a laptop), on focus (a keyboard) and on a tap (a phone:
+   js/manager.js sets aria-expanded). It lies over the rows below it and takes
+   the full width of the text column, so it never runs off a phone's screen. */
+.feed div > span { position: relative; }
+.why { all: unset; cursor: help; border-bottom: 1px dotted var(--mut); }
+.why:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 3px; }
+.why-tip { display: none; position: absolute; z-index: 3; inset-inline: 0; top: calc(100% + 6px); padding: 10px 12px; border-radius: 12px; background: #241a12; border: 1px solid var(--edge); box-shadow: 0 10px 28px rgba(0, 0, 0, .55); font-size: 12.5px; font-weight: 400; line-height: 1.5; color: var(--ink); }
+.why:hover + .why-tip, .why:focus-visible + .why-tip, .why[aria-expanded="true"] + .why-tip { display: block; }
+/* build 134: how and when a row sent more than once went ("WhatsApp post 06:27 - Offer PDF 06:31") */
+.feed small.how { color: var(--ink); opacity: .86; }
+/* build 134: today's broadcasts against the daily target, one quiet line under his sales */
+.duty { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; border-top: 1px solid var(--edge); padding-top: 12px; font-size: 12px; color: var(--mut); }
+.duty > span:first-child { margin-inline-end: auto; }
+.duty .dots { display: inline-flex; gap: 5px; }
+.duty .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--never); }
+.duty .dots i.on { background: var(--acc); }
+.duty .why { color: var(--ink); font-weight: 700; font-size: 12.5px; }
+/* its explanation opens INSIDE the card, under the line: one that floats is painted over by the tiles below */
+.duty .why-tip { position: static; flex-basis: 100%; box-shadow: none; }
+
+/* ---- build 136 (Muhanad, 2026-10-10) ------------------------------------------------------------
+   A NUMBER UNDER THE DIAL EXPLAINS ITSELF: the number and its label are one button, and the line that
+   says what it counts opens under the legend on hover (a laptop), on focus (a keyboard) and on a tap
+   (a phone), like "sent 2 times". The dotted line under the label is the only sign of it. */
+.legend { position: relative; }
+.lg .why { grid-column: 2; display: grid; justify-items: start; border-bottom: 0; }
+/* the number over its label, as before: ".lg b" above would send the number to a second column of the button */
+.lg .why > b, .lg .why > span { grid-column: 1; }
+.lg .why > span { font-size: 11.5px; color: var(--mut); border-bottom: 1px dotted var(--faint); }
+/* the explanation takes the legend's whole width, not its own number's column: the legend is a grid and is
+   what the box is placed against, and ".lg > span" above would otherwise put it in the second column */
+.legend .why-tip { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink); }
+/* THE DAY'S BROADCASTS, one line for each sales agent: the name, a dot for each broadcast the target asks
+   for, and one number. A zero is the highlight. Its explanation opens under the card's own heading. */
+.duty-card h2 { position: relative; }
+.duty-card h2 .why { cursor: help; }
+.row.duty-row { grid-template-columns: minmax(0, 1fr) auto auto; gap: 0 12px; padding: 11px 0; }
+.duty-row .who { grid-column: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.duty-row .who .nm { min-width: 0; }
+.duty-row .who .idle { flex: none; }
+.duty-row .dots { grid-column: 2; display: inline-flex; justify-content: flex-end; gap: 5px; }
+.duty-row .dots i, .duty-row .dots i.on { width: 9px; height: 9px; border-radius: 50%; transition: none; }
+.duty-row .dots i.on { background: var(--acc); }
+.duty-row .val { grid-column: 3; grid-row: 1; min-width: 22px; }
+.duty-row.none .val { color: var(--bad); }
+/* AN ENTRY IN A FEED OPENS (the manager's page): the whole line is the button */
+.feed div.tap { cursor: pointer; border-radius: 10px; }
+.feed div.tap:hover > span { color: var(--acc); }
+.feed div.tap:focus-visible { outline: 2px solid var(--acc); outline-offset: 4px; }
+/* THE ADMIN'S HISTORY: one line for each thing recorded, taken back, cancelled or removed */
+.tab.four { grid-template-columns: repeat(4, 1fr); }
+.hist { display: grid; }
+.hist .hl { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 3px; padding: 11px 0; border-top: 1px solid var(--edge); width: 100%; }
+.hist .hl:first-child { border-top: 0; padding-top: 0; }
+.hist .hl:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 6px; }
+.hist .k { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); }
+.hist .k.rm { color: var(--bad); } .hist .k.rec { color: var(--good); } .hist .k.tb { color: var(--warn); }
+.hist b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.hist small { font-size: 11.5px; line-height: 1.45; color: var(--mut); }
+.hist q { font-size: 12.5px; line-height: 1.45; color: var(--ink); }
+.duty-card h2 .why-tip { text-align: start; }
+/* build 146 (audit of 2026-10-10, item 8): on a phone the explanation floated over the first sales agent's name.
+   It now opens IN the card, under the heading, and the names move down for it, as the duty line's does. */
+.duty-card h2 { flex-wrap: wrap; }
+.duty-card h2 em { display: contents; }
+.duty-card h2 .why { margin-inline-start: auto; text-align: end; }
+.duty-card h2 .why-tip { position: static; flex-basis: 100%; box-shadow: none; margin-top: 4px; }
+
+/* ---- build 137 (Muhanad, 2026-10-10) ------------------------------------------------------------
+   WHILE A SHEET IS OPEN THE BAR AND THE PLUS STEP ASIDE. On a laptop the sheet stands in the middle,
+   a little above the foot of the screen, and the bar stood under it with its lower edge showing
+   below the sheet's: "there is overlab bars". A phone's sheet covers them anyway. They come back a
+   moment after the sheet has started down. (html.is-locked is set by showSheet, js/manager.js and
+   js/admin.js, so this holds for the sales agent's page, the manager's and the admin's.) */
+.tab, .fab { transition: opacity .2s ease .12s, visibility 0s linear .12s; }
+html.is-locked .tab, html.is-locked .fab { opacity: 0; visibility: hidden; transition: opacity .15s ease, visibility 0s linear .15s; }
+/* THE COMPANIES LIST OPENS ON ITS FIRST SIX AND SCROLLS INSIDE ITSELF, like the payment schedule. The
+   height is set by js/manager.js (listFit) to end where the seventh row starts; the one here stands
+   until it has. The heading of the columns is outside the box, so it stays in place. */
+.rows.inbox { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--edge) transparent; padding-inline-end: 10px; }
+.rows.inbox:focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; border-radius: 6px; }
+.inbox-hint { margin: 0; padding-top: 10px; border-top: 1px solid var(--edge); font-size: 11px; letter-spacing: .06em; color: var(--faint); }
+
+/* ---- build 138 (Muhanad, 2026-10-10: the final list is about 2,000 companies) ----------------------
+   THE COMPANY IS FOUND BY TYPING in the Record form. The names open under the field, inside the form,
+   and scroll inside their own box: about six show at a time. */
+.pick-list { display: grid; gap: 2px; margin-top: 2px; padding: 6px; max-height: 276px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--edge) transparent; border-radius: 12px; border: 1px solid var(--edge); background: #17110c; }
+.pick-list[hidden] { display: none; }
+.pick-o { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; min-height: 42px; padding: 10px; border-radius: 8px; font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink); overflow-wrap: anywhere; }
+.pick-o:hover, .pick-o:focus-visible { background: rgba(247, 149, 30, .16); }
+.pick-h, .pick-none { margin: 0; padding: 6px 10px; }
+.pick-none { font-size: 12.5px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--mut); }
+
+/* build 139: the letters typed stand out in each name offered, as in "Who is this offer for?" */
+.pick-o b { font-weight: 700; color: var(--acc); }
+
+/* build 140: an offer a manager sent, handed to a sales agent. The History's line; the card and the
+   sheet on the manager's page; the mark on a row. */
+.hist .k.ho { color: var(--acc); }
+.row .hand { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 12px; font-weight: 700; padding: 8px 13px; border-radius: 999px; background: var(--acc); color: #000; white-space: nowrap; }
+.row .to { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-align: end; font-size: 12.5px; font-weight: 600; max-width: 130px; overflow-wrap: anywhere; }
+.row .to small { display: block; font-size: 9.5px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--mut); }
+.by-mgr { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--warn); border: 1px dashed var(--edge); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.choose { display: grid; gap: 4px; padding: 6px; border-radius: 14px; border: 1px solid var(--edge); max-height: 262px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.choose button { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; align-items: center; min-height: 42px; padding: 9px 10px; border-radius: 9px; font-size: 14.5px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.choose button::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--mut); }
+.choose button[aria-pressed="true"] { background: rgba(247, 149, 30, .16); }
+.choose button[aria-pressed="true"]::before { border-color: var(--acc); background: radial-gradient(circle, var(--acc) 0 45%, transparent 50%); }
+.choose button:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+
+/* ---- THE WEEK (Muhanad, 2026-10-11; mocked first) ------------------------------------------------
+   One line for each sales agent on the Team tab: the name, the week's broadcasts as round dots (a
+   column for each working day, a dot for each one the day asks for), the week's orientations as
+   squares against the week's target, and one number each. A square's colour is the door the visit
+   knocked on; a green ring is a request that followed. Home carries one line that opens it. */
+.wk-card { --bcw: 78px; --orw: 105px; }
+.wk-card h2 { position: relative; }
+.wk-card h2 .why { cursor: help; }
+.wk-card h2 .why-tip { text-align: start; }
+.wk-head, .row.wk-row { display: grid; grid-template-columns: minmax(0, 1fr) var(--bcw) var(--orw); column-gap: 10px; align-items: center; }
+.wk-head { font-size: 8.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; color: var(--faint); margin-bottom: -6px; }
+.row.wk-row { row-gap: 0; padding: 11px 0; }
+/* a long name takes a second line: a name is never cut on this card */
+.wk-row .nm { white-space: normal; overflow-wrap: anywhere; }
+/* the little arrow never drops to a line of its own: it is tied to the last word of the name */
+.row.wk-row:not(.flat) .nm::after { content: "\00a0›"; }
+[dir="rtl"] .row.wk-row:not(.flat) .nm::after { content: "\00a0‹"; }
+.wk-m { display: grid; grid-template-columns: minmax(0, 1fr) 24px; gap: 8px; align-items: center; }
+.wk-m b { font-weight: 800; font-size: 18px; text-align: end; }
+.wk-m b.zero, .wk-days b.zero { color: var(--bad); }
+.wk-bc { display: grid; grid-auto-flow: column; grid-auto-columns: 5px; gap: 3px; }
+.wk-bc i, .wk-col i { border-radius: 50%; background: var(--never); }
+.wk-bc i.on, .wk-col i.on { background: var(--acc); }
+/* a day still to come: hollow */
+.wk-bc i.later, .wk-col i.later { background: none; box-shadow: inset 0 0 0 1px var(--never); }
+.wk-pp { display: grid; grid-auto-rows: 7px; gap: 6px 5px; padding: 3px; justify-content: start; }
+.wk-pp i, .wk-pip, .wk-keys i { border-radius: 2px; background: var(--never); }
+.wk-pp i.asking, .wk-pip.asking, .wk-keys i.asking { background: #85796e; }
+.wk-pp i.quiet, .wk-pip.quiet, .wk-keys i.quiet { background: var(--warn); }
+.wk-pp i.fresh, .wk-pip.fresh, .wk-keys i.fresh { background: var(--ink); }
+.wk-pp i.led, .wk-pip.led, .wk-keys i.led { outline: 1.5px solid var(--good); outline-offset: 1.5px; }
+.wk-pip, .wk-keys i { display: inline-block; flex: none; width: 8px; height: 8px; }
+.wk-keys i.led { width: 6px; height: 6px; margin: 0 1px; }
+/* the four words under the card: each one opens its sentence under them */
+.wk-keys { display: flex; flex-wrap: wrap; gap: 8px 14px; border-top: 1px solid var(--edge); padding-top: 12px; font-size: 11.5px; color: var(--mut); }
+.wk-keys .why { display: inline-flex; align-items: center; gap: 7px; border-bottom: 0; }
+.wk-keys .why span { border-bottom: 1px dotted var(--mut); }
+.wk-keys .why-tip { position: static; order: 1; flex-basis: 100%; box-shadow: none; }
+/* the line on Home, at the foot of the day's Broadcasts card */
+.go.wk-go b { font-size: 15px; }
+/* a sales agent's week, opened */
+.wk-days { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.wk-days > div { display: grid; justify-items: center; gap: 6px; }
+.wk-col { display: grid; gap: 4px; }
+.wk-col i { width: 9px; height: 9px; }
+.wk-days b { font-size: 16px; font-weight: 800; line-height: 1; }
+.wk-days b.later { color: var(--faint); }
+.wk-days small { font-size: 9.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--mut); }
+.kv span .wk-pip { margin-inline-end: 6px; }
+.row.wk-vis { grid-template-columns: 12px minmax(0, 1fr) auto; }
+.wk-vis .wk-pip { grid-column: 1; grid-row: 1; }
+.wk-vis .nm, .wk-vis .sub { grid-column: 2; }
+.wk-vis .val { grid-column: 3; grid-row: 1 / span 2; }
+.wk-vis .sub .ok { color: var(--good); font-weight: 600; }
+/* Arabic figures are set wider: the number keeps its own room beside the dots */
+html[lang="ar"] .wk-card { --bcw: 84px; --orw: 111px; }
+html[lang="ar"] .wk-m { grid-template-columns: minmax(0, 1fr) 30px; }
+
+/* ---- MOVEMENT AND THE CHIPS, three things he met (Muhanad, 2026-10-11) ----------------------------
+   THE CARD SCROLLED DOWN INTO NOTHING. A strip that slides sideways also scrolled down, to the height
+   of its tallest list, while the page showed a shorter one: "I can scroll on the card and there is
+   nothing there". The strip is cut to the list on screen (js sets its height) and never scrolls down. */
+.deck { overflow-y: hidden; }
+/* A COMPANY'S ROW STANDS APART FROM THE LINES. Under an opened line (Started asking, Came back, ...)
+   the companies were drawn like the lines themselves: "it is hard to see the difference". Each company
+   is now a lighter block of its own, and the line that is open keeps its plain look above them. */
+.mv-list { gap: 6px; padding: 0 0 12px; padding-inline-start: 0; border-inline-start: 0; margin-bottom: 0; }
+.mv-list .row, .mv-list .row:first-child { border-top: 0; border-radius: 14px; padding: 11px 12px; background: rgba(255, 244, 230, .055); }
+.mv-list .row:hover, .mv-list .row:focus-visible { background: rgba(255, 244, 230, .085); }
+.mv-list .mv-more { padding: 6px 12px 0; }
+.deck.mv .dslide, .deck.fit .dslide { overflow: hidden; }
+
+/* ---- build 143: the team's sales on the Team tab; a sales agent's weeks, one kind of work at a time ---- */
+/* Team sales is the Team Pulse drawing (css/styles.css, "Team Pulse: the half-dial, a heartbeat through it"),
+   in green, his choice on the mock: the dial fills with each sales agent's share, the heartbeat draws through
+   once and gives way to the figure. Without the animations it is the finished dial: no heartbeat, the figure shown. */
+.ts-dial { direction: ltr; overflow: visible; }
+.gauge .ts-arc { stroke: var(--good); animation: ts-sweep .85s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--k) * 120ms + 120ms); }
+.gauge .ts-beat { stroke: var(--acc); stroke-width: 3; stroke-linejoin: round; stroke-dasharray: 100; stroke-dashoffset: 0; opacity: 0; filter: drop-shadow(0 0 6px rgba(247,149,30,.7)); animation: ts-beat 1.9s cubic-bezier(.45, 0, .2, 1) .35s both; }
+.ts-fig { transform-box: fill-box; transform-origin: center; animation: ts-fig .5s ease-out 1.9s both; }
+@keyframes ts-sweep { from { stroke-dasharray: 0 629; } }
+@keyframes ts-beat { 0% { stroke-dashoffset: 100; opacity: 1; } 45%, 75% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes ts-fig { from { opacity: 0; transform: translateY(6px); } }
+.ts-who { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 12px; color: var(--mut); }
+.ts-who span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; } .ts-who b { color: var(--ink); font-weight: 700; }
+.ts-who i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); opacity: var(--o, 1); }
+/* A column of a sales agent's chart opens to what it holds: a pane of glass over the sheet, the app blurred a
+   little behind it (js/manager.js, openGlass). Where a browser cannot blur what lies behind, it is the app's
+   own card on a darker veil. */
+.gveil { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.72); opacity: 0; pointer-events: none; transition: opacity .25s; }
+.gveil.on { opacity: 1; pointer-events: auto; }
+.glass { position: fixed; z-index: 11; left: 50%; top: 50%; width: min(calc(var(--col) - 48px), calc(100% - 32px)); max-height: min(70dvh, 560px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: grid; gap: 14px; align-content: start; padding: 18px; border-radius: 24px; color: var(--ink); background: var(--card); border: 1px solid var(--edge); box-shadow: 0 24px 70px rgba(0,0,0,.55), 0 0 60px rgba(247,149,30,.14); transform: translate(-50%, -46%) scale(.96); opacity: 0; visibility: hidden; transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .2s, visibility 0s .3s; }
+.glass::-webkit-scrollbar { display: none; }
+.glass.on { transform: translate(-50%, -50%); opacity: 1; visibility: visible; transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .2s; }
+.glass > * { min-width: 0; }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .gveil { background: rgba(12,9,7,.3); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }
+  .glass { background: linear-gradient(160deg, rgba(255,214,170,.14), rgba(255,214,170,.04)), rgba(23,17,12,.5); border-color: rgba(255,214,170,.24); box-shadow: 0 24px 70px rgba(0,0,0,.55), 0 0 60px rgba(247,149,30,.14), inset 0 1px 0 rgba(255,255,255,.16); -webkit-backdrop-filter: blur(22px) saturate(1.3); backdrop-filter: blur(22px) saturate(1.3); }
+}
+.glass h3 { margin: 0; font-size: 20px; font-weight: 700; padding-inline-end: 44px; overflow-wrap: anywhere; display: flex; align-items: baseline; gap: 10px; }
+.glass h3 b { font-size: 14px; font-weight: 700; color: var(--mut); }
+.glass .role { margin: 4px 0 0; font-size: 12px; line-height: 1.5; color: var(--mut); }
+.glass .x { all: unset; cursor: pointer; position: absolute; top: 14px; inset-inline-end: 14px; width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,214,170,.24); display: grid; place-items: center; font-size: 16px; }
+.glass .x:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+/* the pane day by day: the week's seven days with their numbers, then a block for each day that holds something */
+.gl-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding: 10px 6px; border-radius: 16px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,214,170,.14); }
+.gl-week div { display: grid; justify-items: center; gap: 3px; }
+.gl-week small { font-size: 9.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--mut); }
+.gl-week b { font-size: 19px; font-weight: 800; line-height: 1.1; } .gl-week b.none { color: var(--faint); font-weight: 500; }
+.gl-week span { font-size: 10px; color: var(--faint); }
+/* one day darker, the next lighter, as the rows of a table are */
+.gl-days { display: grid; gap: 6px; }
+.gl-day { display: grid; gap: 10px; padding: 12px 14px; border-radius: 16px; background: rgba(255,244,230,.045); }
+.gl-day:nth-child(even) { background: rgba(255,244,230,.1); }
+.gl-day > p { margin: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.gl-day > p b { min-width: 24px; padding: 2px 8px; border-radius: 999px; background: rgba(255,244,230,.12); font-size: 12.5px; letter-spacing: 0; text-align: center; }
+/* EVERY LIST OF ROWS: ONE ROW A SHADE LIGHTER, THE NEXT A SHADE DARKER (Muhanad, 2026-10-12, on a company's
+   "Latest with your team" and "How it moved": "any part in the app like this should have color grading the
+   one we did one light one a bit darkwe to make it easier to read"). The shades of the pane's days, on the
+   rows of a feed, a story, a list of names, a list of facts and every list of rows; the hairlines between
+   rows go, the shade does their work. Inside a day of the pane the day is the block, so its rows are plain.
+   The two shades are close on purpose: his word on the first ones, "a bit lighter it should be a slight
+   diffrence not that much". */
+.feed, .story, .who { gap: 3px; }
+.feed > div, .story > div, .who > div, .facts > div, .rows > .row { padding: 8px 10px; border-top: 0; border-radius: 10px; background: rgba(255,244,230,.025); }
+.rows > .row { padding-block: 10px; }
+.feed > div:nth-child(even), .story > div:nth-child(even), .who > div:nth-child(even), .facts > div:nth-child(even), .rows > .row:nth-child(even) { background: rgba(255,244,230,.055); }
+/* on a laptop a wide card sets its rows two abreast: the shade goes by the line, not by the row's number */
+@media (min-width: 900px) {
+  .wide .rows > .row:nth-child(even) { background: rgba(255,244,230,.025); }
+  .wide .rows > .row:nth-child(4n+3), .wide .rows > .row:nth-child(4n+4) { background: rgba(255,244,230,.055); }
+}
+.gl-day .feed { gap: 10px; }
+.gl-day .feed > div, .gl-day .feed > div:nth-child(even) { padding: 0; border-radius: 0; background: none; }
+.sec em { font-style: normal; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--faint); margin-inline-start: 6px; }
+#pd .dslide { gap: 0; } #pdDots { margin-top: 10px; }
+
+/* ---- build 144 (Muhanad, 2026-10-15) ----------------------------------------------------------------
+   THE DAY'S DIAL, WHO DID EFFECTIVE WORK: met a client (the green of "active"), visited a company (the
+   same green, half), requests only (slate), no effective work yet (the empty colour). */
+.s-client { background: var(--good); } .c-client { stroke: var(--good); }
+.gauge .c-client.arc { filter: drop-shadow(0 0 6px rgba(47,191,143,.5)); }
+.s-visit { background: rgba(47,191,143,.5); } .c-visit { stroke: rgba(47,191,143,.5); }
+.s-desk { background: var(--neut); } .c-desk { stroke: var(--neut); }
+/* EVERY CHART DRAWS THE DATES CHOSEN: a name under each column, and a day still to come is an empty outline */
+.wk.per { gap: 3px; text-align: center; }
+.col.later { cursor: default; }
+.col.later i, .col.later i.z { background: transparent; border: 1px dashed rgba(255,214,170,.2); border-bottom: 0; opacity: 1; }
+.strip i.later { background: transparent; box-shadow: inset 0 0 0 1px rgba(255,214,170,.16); }
+/* a reservation and a contract are counted apart: four figures stand in one row */
+.kv.k4 { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.kv.k4 div { padding: 9px 8px; } .kv.k4 b { font-size: 18px; }
+/* build 145: the dial's explanation, then the names on a line of their own */
+.legend .why-tip { white-space: pre-line; }
+/* build 145, THE MEETING BEHIND A RESERVATION: the question in the Record form, as on the mock he approved
+   (one warm box, two answers side by side, the chosen one white like a chosen chip) */
+.ask { display: grid; gap: 10px; padding: 13px; border-radius: 16px; background: rgba(247,149,30,.07); border: 1px solid rgba(247,149,30,.45); }
+.ask .q { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.35; color: var(--ink); }
+.ask .q small { display: block; margin-top: 3px; font-size: 12px; font-weight: 500; color: var(--mut); }
+.ask .pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ask .pick button { all: unset; box-sizing: border-box; cursor: pointer; text-align: center; min-height: 40px; padding: 9px 6px; border-radius: 12px; border: 1px solid var(--edge); font-size: 13px; font-weight: 700; color: var(--ink); }
+.ask .pick button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #000; }
+.ask .hint { margin: 0; font-size: 12px; line-height: 1.4; color: var(--mut); }
+.ask .chips .chip { white-space: normal; text-align: start; }
+.fld textarea { font: inherit; font-size: 16px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink); background: rgba(255,255,255,.04); border: 1px solid var(--edge); border-radius: 12px; padding: 10px; min-height: 54px; width: 100%; box-sizing: border-box; resize: vertical; color-scheme: dark; }
+/* the quiet line on a reservation's row: no meeting (orange, dashed), or the meeting was online (green) */
+.row .mflag { grid-column: 1 / -1; font-size: 12px; line-height: 1.35; color: var(--ink); padding: 6px 9px; border-radius: 9px; background: rgba(247,149,30,.09); border: 1px dashed rgba(247,149,30,.4); white-space: normal; }
+.row .mflag.ok { background: rgba(47,191,143,.08); border-color: rgba(47,191,143,.4); }

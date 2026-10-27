@@ -22,6 +22,13 @@
      unit and make an offer.
    - A role the app does not recognise gets NOTHING. Fail closed.
    - It records nothing about a customer, here or anywhere else.
+
+   BUILD 122: THE REAL STORE. Where CONFIG.store is in use (see real()),
+   signIn() asks the database: the person signs in with the email and
+   password the admin gave him, and his name, role and team come from his
+   row there, never from this file. The demo accounts do not work there,
+   and a store session does not work on the demo link. Everything else in
+   the app still reads the SESSION, so nothing else changed.
    ------------------------------------------------------------------ */
 
 (function (root) {
@@ -31,6 +38,95 @@
   var KEY = 'mm.session.v1';
 
   function cfg() { return typeof CONFIG !== 'undefined' ? CONFIG : {}; }
+
+  /* ---- the real store (build 122) -----------------------------------
+     IS THIS PAGE ON THE STORE? Yes wherever the config names one (build
+     124): the store is the app. No, on a copy published without it, and in
+     a browser switched to the demo by hand (login.html?store=demo), which
+     is how the demo book is still shown on this machine. */
+  function store() {
+    var s = cfg().store;
+    return s && s.url && s.key ? s : null;
+  }
+  function real() {
+    var s = store(), flag = '';
+    if (!s || typeof location === 'undefined') return false;      /* the check scripts load this file outside a browser */
+    try { flag = localStorage.getItem('mm.store') || ''; } catch (e) { flag = ''; }
+    return flag !== 'demo';
+  }
+
+  /* One call to the store. Resolves { status, body } whatever the answer;
+     rejects only when there is no connection at all. `token` is the signed-in
+     person's; without it the public key goes, which opens nothing. */
+  function api(path, o, token) {
+    var s = store();
+    o = o || {};
+    return fetch(s.url + path, {
+      method: o.method || 'GET',
+      headers: { apikey: s.key, Authorization: 'Bearer ' + (token || s.key), 'Content-Type': 'application/json' },
+      body: o.body ? JSON.stringify(o.body) : undefined
+    }).then(function (r) {
+      return r.text().then(function (x) {
+        var j = null;
+        try { j = x ? JSON.parse(x) : null; } catch (e) { j = null; }
+        return { status: r.status, body: j };
+      });
+    });
+  }
+
+  /* The person's own row: name, role, team. An account that is switched off,
+     or that has no row, gets back an empty list (the database's rule), and an
+     empty list is not a person. */
+  function person(id, access) {
+    return api('/rest/v1/mm_people?id=eq.' + encodeURIComponent(id) +
+      '&select=id,name,title,staff_code,role,team_id,active,must_change_password', null, access)
+      .then(function (r) { return r.status === 200 && Array.isArray(r.body) && r.body[0] && r.body[0].active ? r.body[0] : (r.status === 200 ? null : false); });
+  }
+
+  /* Every project that is released: which projects a person may sell is not
+     in the store yet, so on the store everybody sells what is on sale. */
+  function allProjects() { return (cfg().projects || []).map(function (p) { return p.id; }); }
+
+  function sessionOf(p, email, tok) {
+    return {
+      id: p.id, name: p.name, email: email || '', role: p.role, phone: '',
+      staff: p.staff_code || '', team: p.team_id || '', title: p.title || '',
+      projects: allProjects(), demo: false, real: true,
+      mustChange: !!p.must_change_password,
+      access: tok.access_token, refresh: tok.refresh_token,
+      exp: Date.now() + (Number(tok.expires_in) || 3600) * 1000,
+      at: new Date().toISOString()
+    };
+  }
+
+  /* o: { who, code } -> a PROMISE of { ok: true, session } | { ok: false, why } */
+  function signInReal(o) {
+    var who = String((o && o.who) || '').trim().toLowerCase();
+    var code = String((o && o.code) || '');
+    if (!who) return Promise.resolve({ ok: false, why: 'Enter your work email.' });
+    if (!code) return Promise.resolve({ ok: false, why: 'Enter your password.' });
+    var tok = null;
+    return api('/auth/v1/token?grant_type=password', { method: 'POST', body: { email: who, password: code } })
+      .then(function (r) {
+        if (r.status !== 200 || !r.body || !r.body.access_token) {
+          var c = (r.body && (r.body.error_code || r.body.code)) || '';
+          if (c === 'user_banned') return { ok: false, why: 'This account is switched off. Ask the admin.' };
+          if (r.status === 400 || r.status === 401 || r.status === 422) return { ok: false, why: 'That email and password do not match.' };
+          return { ok: false, why: 'Signing in is not answering. Try again in a moment.' };
+        }
+        tok = r.body;
+        return person(tok.user.id, tok.access_token).then(function (p) {
+          if (p === false) return { ok: false, why: 'Signing in is not answering. Try again in a moment.' };
+          if (!p) return { ok: false, why: 'This account is switched off. Ask the admin.' };
+          if (!(cfg().roles || {})[p.role]) return { ok: false, why: 'This account has no role set. Ask for it to be fixed before using the app.' };
+          var s = sessionOf(p, who, tok);
+          write(s);
+          live = s;
+          return { ok: true, session: s };
+        });
+      })
+      .catch(function () { return { ok: false, why: 'No connection. Signing in needs the internet.' }; });
+  }
 
   /* ---- the session --------------------------------------------------
      Kept in localStorage, not sessionStorage: a salesperson signs in once
@@ -43,6 +139,8 @@
       if (!s || !s.id || !s.role) return null;
       /* A role that is no longer configured is not a session. */
       if (!(cfg().roles || {})[s.role]) return null;
+      /* a demo session is not a store session, and the other way round */
+      if (!!s.real !== real()) return null;
       return s;
     } catch (e) {
       return null;            /* private mode, or a store we cannot read */
@@ -72,6 +170,7 @@
      Marks has not sent the team, and guessing a format we would have to
      change later is how you end up supporting two. */
   function signIn(o) {
+    if (real()) return signInReal(o);
     var users = cfg().users || [];
     var who = String((o && o.who) || '').trim().toLowerCase().replace(/\s+/g, ' ');
     var code = String((o && o.code) || '').trim();
@@ -111,9 +210,290 @@
   }
 
   function signOut() {
+    var s = current();
+    /* tell the store too, so the session cannot be used again; if there is no signal the phone is still signed out */
+    if (s && s.real && s.access) { try { api('/auth/v1/logout', { method: 'POST' }, s.access).catch(function () {}); } catch (e) { /* signed out here anyway */ } }
     try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
     live = null;
   }
+
+  /* ---- the store: staying signed in ----------------------------------
+     The store's pass lasts an hour and is renewed with a second one. A
+     promise of a pass that works, for whatever is about to call the store.
+     Rejects 'offline' with no signal (the person stays signed in: he can
+     still make an offer), and 'out' when the store will not renew it (the
+     account was switched off, or signed out elsewhere): then he is signed
+     out here too. */
+  var renewing = null;
+  function token() {
+    var s = current();
+    if (!s || !s.real) return Promise.reject(new Error('out'));
+    if (s.exp - Date.now() > 60000) return Promise.resolve(s.access);
+    if (renewing) return renewing;
+    renewing = api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: s.refresh } })
+      .then(function (r) {
+        renewing = null;
+        if (r.status === 200 && r.body && r.body.access_token) {
+          s.access = r.body.access_token; s.refresh = r.body.refresh_token;
+          s.exp = Date.now() + (Number(r.body.expires_in) || 3600) * 1000;
+          write(s); live = s;
+          return s.access;
+        }
+        if (r.status === 400 || r.status === 401 || r.status === 403) { bounce(); throw new Error('out'); }
+        throw new Error('offline');
+      }, function () { renewing = null; throw new Error('offline'); });
+    return renewing;
+  }
+
+  /* One signed-in call to the store: { status, body }. Rejects with no signal or when signed out. */
+  function call(path, o) { return token().then(function (access) { return api(path, o, access); }); }
+
+  function bounce() {
+    try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
+    live = null;
+    if (!/login\.html$/.test(location.pathname)) location.replace('login.html');
+  }
+
+  /* IS HE STILL WHO THE PHONE SAYS? Asked once per page, in the background,
+     never in the way of the page. Switched off since he signed in: he is
+     signed out. Role, name or team changed by the admin: the session takes
+     the new ones, and a changed role reloads the page so the right screens
+     show. No signal: nothing happens. */
+  var verified = false;
+  /* NOT WHILE THE ENTRY ANIMATION IS ON THE GLASS (build 130). On a page that opens through the logo
+     build, these answers used to land while the letters were rising, and each one cost the animation
+     a frame. Nothing here is needed under a black screen, so it waits for the black to go
+     (MM.markbuild.after, which runs it at once on every other page). */
+  /* build 132: My activity opens on the pulse, which offers the same `after` as MM.entry (js/manager.js) */
+  function quiet(fn) { var e = MM.markbuild || MM.entry; if (e && e.after) e.after(fn); else fn(); }
+  function verify() {
+    if (verified) return;
+    verified = true;
+    quiet(verifyNow);
+  }
+  function verifyNow() {
+    token().then(function (access) {
+      var s = current();
+      if (!s) return;
+      return person(s.id, access).then(function (p) {
+        if (p === false) return;                       /* the store did not answer: leave him be */
+        if (!p || !(cfg().roles || {})[p.role]) { bounce(); return; }
+        var was = s.role;
+        s.name = p.name; s.role = p.role; s.staff = p.staff_code || ''; s.team = p.team_id || '';
+        s.title = p.title || ''; s.mustChange = !!p.must_change_password;
+        write(s); live = s;
+        if (was !== p.role) { location.reload(); return; }
+        flushOffers();
+        marks(access);
+        return companies(access);
+      });
+    }).catch(function () { /* offline, or already signed out */ });
+  }
+
+  /* THE BROKERAGE COMPANIES (build 125). On the store the list an agent chooses from is the admin's:
+     a company she adds is offered to everyone, one she switches off is not. It is fetched once per page,
+     in the background, and kept on the phone, so "Who is this offer for?" still has its list with no
+     signal. On the demo the list in js/config.js is used; on the real app that file has none (build 128)
+     and a phone with no list yet fetches it when the sheet opens (loadCompanies). */
+  var CO_KEY = 'mm.companies.v1';
+  /* THE WHOLE LIST, PAGE BY PAGE (build 137). The store hands over at most a thousand rows per question,
+     whatever is asked, and says nothing when it stops there; the final list is about two thousand
+     companies (Muhanad, 2026-10-10). So it is asked for a page at a time until a page comes back empty.
+     A list that came only in part is never kept: the phone keeps the one it had. */
+  function companies(access) {
+    var all = [];
+    var next = function (from) {
+      return api('/rest/v1/mm_companies?select=id,name&active=eq.true&order=name.asc,id.asc&limit=1000&offset=' + from, null, access).then(function (r) {
+        if (r.status !== 200 || !Array.isArray(r.body)) return false;
+        all = all.concat(r.body);
+        return r.body.length ? next(from + r.body.length) : true;
+      });
+    };
+    return next(0).then(function (whole) {
+      if (!whole) return;
+      try { localStorage.setItem(CO_KEY, JSON.stringify(all)); } catch (e) { /* this visit only */ }
+    });
+  }
+  /* [{ id, name }] from the store, or null when this is the demo or nothing has been fetched yet */
+  function companyList() {
+    if (!real()) return null;
+    try {
+      var a = JSON.parse(localStorage.getItem(CO_KEY) || 'null');
+      return Array.isArray(a) && a.length ? a : null;
+    } catch (e) { return null; }
+  }
+  /* The list, fetched NOW (build 128). The real app's js/config.js carries no company list any more, so
+     nothing stands in for it: "Who is this offer for?" calls this when the phone has none yet. Answers
+     with [{ id, name }]; rejects with no signal, or when the store does not hand the list over. */
+  function loadCompanies() {
+    return token().then(function (access) { return companies(access); }).then(function () {
+      var a = companyList();
+      if (!a) throw new Error('offline');
+      return a;
+    });
+  }
+
+  /* EVERY OFFER SENT IS SAVED (build 127). Called when an offer leaves the app. It never stands in the
+     way of the send: the row is put on a list kept on the phone first, then sent to the store, and what
+     the store has not confirmed is sent again on the next page (so an offer made with no signal is
+     still counted). Each row carries its own reference, made here, so a row sent twice is saved once.
+     o: { company: name | null (a general broadcast), product, channel: 'pdf' | 'post', unit, area, value, key }
+     A company that is not on the admin's list cannot be counted for a company: it is saved as a
+     general broadcast, and "Who is this offer for?" says so before the send. */
+  var OFFERS_KEY = 'mm.offers.queue.v1';
+  function queued() { try { var a = JSON.parse(localStorage.getItem(OFFERS_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function setQueued(a) { try { localStorage.setItem(OFFERS_KEY, JSON.stringify(a)); } catch (e) { /* this visit only */ } }
+  function companyId(name) {
+    var list = companyList() || [], want = String(name || '').trim().toLowerCase(), i;
+    if (!want) return null;
+    for (i = 0; i < list.length; i++) if (String(list[i].name).trim().toLowerCase() === want) return list[i].id;
+    return null;
+  }
+  /* ON A PHONE THE OFFER LEAVES THROUGH THE SHARE SHEET, and the phone may put this page to sleep, or
+     throw it away, while the agent is in WhatsApp. So the row is written to the phone BEFORE the share
+     sheet opens (offerLeaving, held), and released when the sheet answers (offerLeft), or removed when
+     the agent closed the sheet without sending (offerNotSent). A held row found by a LATER page means
+     the page died with the sheet open: a closed sheet comes straight back to a living page, so that
+     row is an offer that went, and it is saved. */
+  var holding = {}, heard = {};
+  function offerLeaving(o) { var ref = logOffer(o, true); if (ref) holding[ref] = true; return ref; }
+  /* saved (build 129): called once with the store's row when this send is saved, if this page is still
+     here to hear it. A general broadcast's row says how many times it has left the app today. */
+  function offerLeft(ref, saved) {
+    if (!ref) return;
+    delete holding[ref];
+    if (typeof saved === 'function') heard[ref] = saved;
+    setQueued(queued().map(function (r) { if (r.p_client_ref === ref) delete r.hold; return r; }));
+    flushOffers();
+  }
+  function offerNotSent(ref) {
+    if (!ref) return;
+    delete holding[ref];
+    setQueued(queued().filter(function (r) { return r.p_client_ref !== ref; }));
+  }
+  function logOffer(o, hold) {
+    var s = current(), q, ref;
+    if (!real() || !s || !s.real) return null;
+    o = o || {};
+    q = queued();
+    ref = 'o-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+    q.push({ by: s.id, hold: hold ? 1 : undefined,
+      p_client_ref: ref,
+      propose: o.propose && o.company ? String(o.company).trim() : undefined,
+      p_company: o.propose ? null : companyId(o.company), p_product: o.product || null, p_channel: o.channel === 'post' ? 'post' : 'pdf',
+      p_unit: o.unit || null, p_area: o.area || null, p_value: o.value || null, p_sent_at: new Date().toISOString(),
+      /* build 129: what the offer is (js/lineflow.js offerKey). The store joins the sends of one general
+         broadcast on it; left out when the page did not say, and then nothing is joined. */
+      p_offer_key: o.key ? String(o.key).slice(0, 200) : undefined });
+    setQueued(q.slice(-200));
+    if (!hold) flushOffers();
+    return ref;
+  }
+  var flushing = false, tried = {};
+  function flushOffers() {
+    var s = current(), mine;
+    if (flushing || !real() || !s || !s.real) return;
+    /* each row is tried once per page: one the store will not take now waits for the next page */
+    mine = queued().filter(function (r) { return r.by === s.id && !tried[r.p_client_ref] && !(r.hold && holding[r.p_client_ref]); });
+    if (!mine.length) return;
+    flushing = true;
+    var done = function (ref) { setQueued(queued().filter(function (r) { return r.p_client_ref !== ref; })); };
+    var next = function (i) {
+      if (i >= mine.length) { flushing = false; flushOffers(); return; }   /* an offer sent meanwhile */
+      var r = mine[i], body = {};
+      tried[r.p_client_ref] = true;
+      Object.keys(r).forEach(function (k) { if (k !== 'by' && k !== 'hold' && k !== 'propose') body[k] = r[k]; });
+      var refusedForGood = function (x) { return !!(x.body && /MM_/.test(String(x.body.message || ''))); };
+      var save = function () {
+        return call('/rest/v1/rpc/mm_log_offer', { method: 'POST', body: body }).then(function (x) {
+          /* saved, or refused for good (the store's own code): either way it does not wait any longer */
+          if (x.status === 200 || refusedForGood(x)) done(r.p_client_ref);
+          var h = heard[r.p_client_ref];
+          if (x.status === 200 || refusedForGood(x)) delete heard[r.p_client_ref];
+          if (h && x.status === 200) { try { h(x.body); } catch (e) { /* the page's own business */ } }
+          next(i + 1);
+        });
+      };
+      /* a company not on the list: the store names it first (the same name always gets the same company).
+         build 134: the name goes WITH THE TIME THE OFFER LEFT THE PHONE (Muhanad, 2026-10-09). An agent who
+         has since been given his third wrong-spelling mark is refused a new name, but not the one on an
+         offer that was already on its way: the store compares this time with the moment the mark landed,
+         and the offer waits for the admin like any other. Before, the store refused the name and the
+         offer was dropped here, two lines down. A store that does not take the time yet answers "no
+         such function" (404): the name is then sent alone, as before. */
+      var propose = function (withTime) {
+        var named = { p_name: r.propose };
+        if (withTime && r.p_sent_at) named.p_sent_at = r.p_sent_at;
+        return call('/rest/v1/rpc/mm_propose_company', { method: 'POST', body: named }).then(function (x) {
+          if (withTime && x.status === 404) return propose(false);
+          if (x.status === 200 && typeof x.body === 'string') { body.p_company = x.body; return save(); }
+          if (refusedForGood(x)) done(r.p_client_ref);
+          next(i + 1);
+        });
+      };
+      (r.propose ? propose(true) : save()).catch(function () { flushing = false; });
+    };
+    next(0);
+  }
+
+  /* A COMPANY THAT IS NOT ON THE LIST (build 127). An agent may send to a company the admin has not
+     listed: it is saved for that company, which waits for the admin. She approves it, or rules it a
+     listed company spelled differently, and that counts against him. Three, and he can no longer
+     propose a company (the store refuses; this is only so the screen says so first). */
+  function marks(access) {
+    return api('/rest/v1/rpc/mm_my_wrong_names', { method: 'POST', body: {} }, access).then(function (r) {
+      var s = current();
+      if (r.status !== 200 || !s || typeof r.body !== 'number') return;
+      s.wrong = r.body; write(s); live = s;
+    }, function () { /* no signal: the last answer stands */ });
+  }
+  function wrongNames() { var s = current(); return (s && s.real && Number(s.wrong)) || 0; }
+  function mayPropose() { return wrongNames() < 3; }
+
+  /* build 146, A STRONGER PASSWORD RULE (audit of 2026-10-10, item 9): the app took 12345678, staff would choose
+     the same, and a manager's account reads the company list. Now: at least 10 characters, letters AND numbers,
+     not a run or a repeat (1234567890, aaaaaaaaaa, qwerty...), not a common word, not his own name from his
+     email. One rule, used by the form and by the save, so the two cannot disagree. Returns '' or why not. */
+  var EASY = ['password', 'passw0rd', 'qwerty', 'asdfgh', 'zxcvbn', 'azerty', 'letmein', 'welcome', 'admin', 'mainmarks', 'moray', 'wellness', 'iloveyou', 'abc123', '123abc', 'egypt', 'cairo'];
+  function passwordProblem(pw, email) {
+    pw = String(pw || '');
+    var low = pw.toLowerCase(), i, step = 0, steps = true, same = true;
+    if (pw.length < 10) return 'Use at least 10 characters.';
+    if (!/[a-z؀-ۿ]/i.test(pw) || !/[0-9٠-٩]/.test(pw)) return 'Use letters and numbers together.';
+    for (i = 1; i < low.length; i++) {
+      var d = low.charCodeAt(i) - low.charCodeAt(i - 1);
+      if (d !== 0) same = false;
+      if (i === 1) step = d; else if (d !== step || Math.abs(d) !== 1) steps = false;
+    }
+    if (Math.abs(step) !== 1) steps = false;
+    if (same || steps || EASY.some(function (w) { return low.indexOf(w) !== -1; }) || /(\d)\1{3}|0123|1234|2345|3456|4567|5678|6789|9876|8765|7654|6543|5432|4321/.test(low) && low.replace(/[^0-9]/g, '').length > low.length / 2) return 'This password is too easy to guess. Choose another.';
+    var parts = String(email || '').toLowerCase().split('@')[0].split(/[^a-z0-9]+/).filter(function (x) { return x.length >= 3; });
+    if (parts.some(function (x) { return low.indexOf(x) !== -1; })) return 'Do not use your name in the password.';
+    return '';
+  }
+
+  /* A PERSON CHOOSES HIS OWN PASSWORD. Resolves { ok } | { ok: false, why }. */
+  function changePassword(pw) {
+    pw = String(pw || '');
+    var s0 = current(), why = passwordProblem(pw, s0 && s0.email);
+    if (why) return Promise.resolve({ ok: false, why: why });
+    return token().then(function (access) {
+      return api('/auth/v1/user', { method: 'PUT', body: { password: pw } }, access).then(function (r) {
+        if (r.status !== 200) {
+          var c = (r.body && (r.body.error_code || r.body.code)) || '';
+          if (c === 'same_password') return { ok: false, why: 'Choose a password that is not the one you were given.' };
+          return { ok: false, why: 'The password could not be changed. Try again.' };
+        }
+        var s = current();
+        if (s) { s.mustChange = false; write(s); live = s; }
+        /* clears the "choose your own password" notice in the store; the password itself is already changed */
+        return api('/rest/v1/rpc/mm_password_changed', { method: 'POST', body: {} }, access).then(function () { return { ok: true }; }, function () { return { ok: true }; });
+      });
+    }).catch(function (e) {
+      return { ok: false, why: e && e.message === 'offline' ? 'No connection. Signing in needs the internet.' : 'The password could not be changed. Try again.' };
+    });
+  }
+
 
   /* ---- the guard ----------------------------------------------------
      Called at the top of every page that needs a person. Returns the
@@ -122,7 +502,13 @@
      asked for rather than dumping everyone on the project list. */
   function require(returnTo) {
     var s = current();
-    if (s) return s;
+    if (s) {
+      /* build 123: the admin has one page. Anywhere else he is taken to it; and it is nobody else's. */
+      var page = location.pathname.split('/').pop() || 'projects.html';
+      if (s.role === 'admin' && page !== 'admin.html') { location.replace('admin.html'); return null; }
+      if (s.real) verify();
+      return s;
+    }
     var here = returnTo || (location.pathname.split('/').pop() + location.search);
     location.replace('login.html?next=' + encodeURIComponent(here));
     return null;
@@ -164,6 +550,9 @@
      carries no staff code, so the account is looked up by its id. */
   function member() {
     var s = current(), team = cfg().salesTeam, staff = '', i;
+    /* build 127: on the store My activity reads the store, so every sales agent has it. His place in
+       his team is the book's to say (js/manager-book.js `me`); here the answer is only yes or no. */
+    if (real()) return s && s.real && s.role === 'sales' ? 0 : -1;
     if (!s || s.role !== 'sales' || !team || !Array.isArray(team.members)) return -1;
     staff = s.staff || '';
     if (!staff) (cfg().users || []).forEach(function (u) { if (u.id === s.id) staff = u.staff || ''; });
@@ -172,7 +561,155 @@
     return -1;
   }
 
+  /* back from WhatsApp, or back online: send what is waiting */
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { tried = {}; flushOffers(); } });
+    root.addEventListener('online', function () { tried = {}; flushOffers(); });
+    root.addEventListener('pageshow', function () { quiet(flushOffers); });
+  }
+
+  /* build 139, ONE RULE FOR FINDING A COMPANY BY TYPING, on the Record form (the sales agent's and the
+     manager's), the manager's Companies search and the admin's "Find a company". Muhanad, 2026-10-10, on
+     live 138: he typed "Na", was offered a name that begins with it, "which is fine", and under it a
+     name that only has the two letters inside its second word, which "does not make sense to show".
+     Two letters found inside a word are noise, and with about 2,000 names they would be most of the
+     list. So: a name that BEGINS with what was typed comes first, then a name with a WORD that begins
+     with it (the second word of a two-word name). A name that only holds the letters inside a word is
+     offered from the THIRD letter on, or when no name begins with them, so the list never says "No
+     company matches." about a name it holds. `at` is where the letters stand in the name, for showing
+     them. (No company is named here: this file is published, and the company list is not.) */
+  function nameHit(name, want) {
+    var low = String(name).toLowerCase(), at = low.indexOf(want), inside = -1, c;
+    while (at !== -1) {
+      if (at === 0) return { rank: 0, at: 0 };
+      c = low.charCodeAt(at - 1);
+      if (!((c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a) || (c >= 0x621 && c <= 0x64a))) return { rank: 1, at: at };
+      if (inside === -1) inside = at;
+      at = low.indexOf(want, at + 1);
+    }
+    return inside === -1 ? null : { rank: 2, at: inside };
+  }
+  /* the rule over a list, best first: [{ item, at }]. `get(item)` gives the name; nothing typed: null */
+  function nameFind(list, typed, get) {
+    var want = String(typed || '').trim().toLowerCase(), tiers = [[], [], []], begins;
+    if (!want) return null;
+    list.forEach(function (x) { var h = nameHit(get ? get(x) : x, want); if (h) tiers[h.rank].push({ item: x, at: h.at }); });
+    begins = tiers[0].concat(tiers[1]);
+    return want.length >= 3 || !begins.length ? begins.concat(tiers[2]) : begins;
+  }
+  MM.nameFind = nameFind;
+
+  /* build 141, THE PAYMENT PLAN A CONTRACT WAS SIGNED ON (Muhanad, 2026-10-11). One reading of the
+     project's plans for the three places that need it: the sales agent's Record form, the manager's
+     (js/manager.js) and the admin's History (js/admin.js). His four answers on the mock:
+       - the plan must be picked before a contract is saved
+       - an offer's plans STAY in this list after the offer ends (`until` is not read here): a contract
+         can be signed later on a reservation made during the offer
+       - a special deal is "Another plan", and asks for its down payment and its years
+       - a contract recorded before this has no plan; the admin can add it
+     A plan is never listed for a unit type it names in `notFor` (as js/plans.js: the offer does not
+     apply to commercial units). What the store keeps is the plan's id and two numbers, so that the
+     record still says what was signed when this list changes: the down payment in per cent of the
+     price, and the years. Spot cash is 100 and 0. */
+  var PLAN_TYPE = { 'Commercial': 'Commercial', 'Clinics': 'Clinic', 'Offices': 'Admin', 'The Fourth': 'Admin' };
+  var PLAN_GROUPS = [['offer', 'Offer plans'], ['original', 'Standard plans']];
+  function escH(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function projectPlans() {
+    var list = (typeof CONFIG !== 'undefined' && CONFIG.projects) || [], i;
+    for (i = 0; i < list.length; i++) if (list[i].id === 'moray') return list[i].plans || [];
+    return [];
+  }
+  function planNumbers(pl) { return pl.cash ? { down: 100, years: 0 } : { down: Math.round(pl.down * 10000) / 100, years: pl.years }; }
+  function planFits(down, years) { return down >= 0 && down <= 100 && years >= 0 && years <= 30 && (years > 0 || down === 100); }
+  /* the plans a contract on this unit type can be signed on: [{ id, group, label, down, years }].
+     `product` is the book's word for the unit ('Clinics', 'Commercial'); not known yet: every plan. */
+  function contractPlans(product) {
+    var type = PLAN_TYPE[product], out = [];
+    projectPlans().forEach(function (pl) {
+      var n = planNumbers(pl);
+      if (!pl.id || pl.id === 'other' || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(pl.id) || !planFits(n.down, n.years)) return;
+      if (type && pl.notFor && pl.notFor.indexOf(type) !== -1) return;
+      out.push({ id: pl.id, group: pl.group || '', label: pl.label, down: n.down, years: n.years });
+    });
+    return out;
+  }
+  function planLabel(label) { return MM.tx && MM.tx.plan ? MM.tx.plan(label) : label; }
+  /* the choices of the plan line, for the unit type in hand; `chosen` stays chosen when still offered */
+  function planOptions(product, chosen) {
+    var t = MM.t, list = contractPlans(product), used = {}, html = '<option value="">' + escH(t('Pick the plan')) + '</option>';
+    var opt = function (pl) { used[pl.id] = 1; return '<option value="' + escH(pl.id) + '"' + (pl.id === chosen ? ' selected' : '') + '>' + escH(planLabel(pl.label)) + '</option>'; };
+    PLAN_GROUPS.forEach(function (g) {
+      var mine = list.filter(function (pl) { return pl.group === g[0]; });
+      if (mine.length) html += '<optgroup label="' + escH(t(g[1])) + '">' + mine.map(opt).join('') + '</optgroup>';
+    });
+    html += list.filter(function (pl) { return !used[pl.id]; }).map(opt).join('');
+    return html + '<optgroup label="' + escH(t('A special deal')) + '"><option value="other"' + (chosen === 'other' ? ' selected' : '') + '>' + escH(t('Another plan')) + '</option></optgroup>';
+  }
+  /* the plan line of a form: the list, and the two numbers "Another plan" asks for */
+  function planField(product, chosen) {
+    var t = MM.t;
+    return '<label class="fld">' + t('Payment plan') + '<select id="rPl">' + planOptions(product, chosen) + '</select></label>' +
+      '<div class="range" id="rPlO"' + (chosen === 'other' ? '' : ' hidden') + '><label class="fld">' + t('Down payment, %') + '<input id="rPd" type="text" inputmode="decimal" autocomplete="off"></label>' +
+      '<label class="fld">' + t('Years') + '<input id="rPy" type="text" inputmode="decimal" autocomplete="off"></label></div>';
+  }
+  /* A number typed by hand, in either script: "12.5", "20%", and the same in Arabic digits with the
+     Arabic decimal mark. Anything else (a sign, a second mark, a letter, a comma) is not a number here:
+     null, never a guess. An Arabic decimal mark that is simply dropped makes a number ten times too
+     large, so each character is read by its own code. */
+  function typedNumber(s) {
+    var x = String(s == null ? '' : s).trim(), out = '', i, c;
+    for (i = 0; i < x.length; i++) {
+      c = x.charCodeAt(i);
+      if (c >= 0x660 && c <= 0x669) out += String(c - 0x660);
+      else if (c >= 0x6F0 && c <= 0x6F9) out += String(c - 0x6F0);
+      else if (c === 0x66B) out += '.';
+      else if (c === 0x66A) out += '%';
+      else out += x.charAt(i);
+    }
+    out = out.replace(/\s*%$/, '');
+    return /^\d{1,3}(\.\d{1,2})?$/.test(out) ? Number(out) : null;
+  }
+  /* what the plan line holds: { id, down, years }, or { missing: 'plan' | 'numbers' }. A listed plan's
+     numbers are the project's own; a special deal's are the two typed, and must be a plan that can be. */
+  function planRead(id, product, downTyped, yearsTyped) {
+    var list, i, d, y;
+    if (!id) return { missing: 'plan' };
+    if (id === 'other') {
+      d = typedNumber(downTyped); y = typedNumber(yearsTyped);
+      return d === null || y === null || !planFits(d, y) ? { missing: 'numbers' } : { id: 'other', down: d, years: y };
+    }
+    list = contractPlans(product);
+    for (i = 0; i < list.length; i++) if (list[i].id === id) return { id: id, down: list[i].down, years: list[i].years };
+    return { missing: 'plan' };
+  }
+  /* a saved plan in words: the project's own label while its id is on the list; a special deal, or a
+     plan that has since left the list, by its two numbers */
+  function planText(id, down, years) {
+    var list = projectPlans(), t = MM.t, ar = MM.isArabic, iso = MM.iso || String, i, d = Number(down), y = Number(years), nums;
+    if (!id) return '';
+    for (i = 0; i < list.length; i++) if (list[i].id === id) return planLabel(list[i].label);
+    if (!(d >= 0) || !(y >= 0)) return id === 'other' ? t('Another plan') : String(id);
+    if (y === 0) nums = t('Cash');
+    else if (!ar) nums = d + '% down · ' + y + (y === 1 ? ' year' : ' years');
+    else nums = (d === 0 ? 'بدون مقدم' : 'مقدم ' + iso(d + '%')) + ' · ' + (y === 1 ? 'سنة واحدة' : y === 2 ? 'سنتان' : iso(y) + (y >= 3 && y <= 10 ? ' سنوات' : ' سنة'));
+    return id === 'other' ? t('Another plan') + ' · ' + nums : nums;
+  }
+  MM.contractPlan = { list: contractPlans, options: planOptions, field: planField, read: planRead, text: planText, number: typedNumber };
+
   MM.auth = {
+    real: real,
+    token: token,
+    call: call,
+    companyList: companyList,
+    loadCompanies: loadCompanies,
+    logOffer: logOffer,
+    wrongNames: wrongNames,
+    mayPropose: mayPropose,
+    offerLeaving: offerLeaving,
+    offerLeft: offerLeft,
+    offerNotSent: offerNotSent,
+    changePassword: changePassword,
+    passwordProblem: passwordProblem,
     member: member,
     current: current,
     signIn: signIn,
