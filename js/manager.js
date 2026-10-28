@@ -234,11 +234,11 @@
   var NOUN = {
     company: ['company', 'companies', 'شركة واحدة', 'شركتان', 'شركات', 'شركة'],
     salesperson: ['sales agent', 'sales agents', 'سيلز واحد', '2 سيلز', 'سيلز', 'سيلز'],
-    meeting: ['meeting', 'meetings', 'اجتماع واحد', 'اجتماعان', 'اجتماعات', 'اجتماعاً'],
-    deal: ['deal', 'deals', 'صفقة واحدة', 'صفقتان', 'صفقات', 'صفقة'],
+    meeting: ['meeting', 'meetings', 'ميتنج واحد', '2 ميتنج', 'ميتنج', 'ميتنج'],
+    deal: ['deal', 'deals', 'بيعة واحدة', 'بيعتان', 'بيعات', 'بيعة'],
     offer: ['offer', 'offers', 'عرض واحد', 'عرضان', 'عروض', 'عرضاً'],
     request: ['request', 'requests', 'طلب واحد', 'طلبان', 'طلبات', 'طلباً'],
-    broadcast: ['broadcast', 'broadcasts', 'منشور عام واحد', 'منشوران عامان', 'منشورات عامة', 'منشوراً عاماً'],
+    broadcast: ['broadcast', 'broadcasts', 'برودكاست واحد', '2 برودكاست', 'برودكاست', 'برودكاست'],
     contract: ['contract', 'contracts', 'عقد واحد', 'عقدان', 'عقود', 'عقداً'],
     reservation: ['reservation', 'reservations', 'حجز واحد', 'حجزان', 'حجوزات', 'حجزاً'],
     cancellation: ['cancellation', 'cancellations', 'إلغاء واحد', 'إلغاءان', 'إلغاءات', 'إلغاءً'],
@@ -246,7 +246,7 @@
     pdf: ['offer PDF', 'offer PDFs', 'ملف PDF واحد', 'ملفان PDF', 'ملفات PDF', 'ملف PDF']
   };
   NOUN.orientation = ['orientation', 'orientations', 'اورينتيشن واحد', '2 اورينتيشن', 'اورينتيشن', 'اورينتيشن'];
-  NOUN.workshop = ['workshop', 'workshops', 'ورشة عمل واحدة', 'ورشتا عمل', 'ورش عمل', 'ورشة عمل'];
+  NOUN.workshop = ['workshop', 'workshops', 'ورك شوب واحد', '2 ورك شوب', 'ورك شوب', 'ورك شوب'];
   NOUN.day = ['day', 'days', 'يوم واحد', 'يومين', 'أيام', 'يوماً'];
   NOUN.special = ['special request', 'special requests', 'طلب خاص واحد', 'طلبان خاصان', 'طلبات خاصة', 'طلباً خاصاً'];
   NOUN.entry = ['entry', 'entries', 'إدخال واحد', 'إدخالان', 'إدخالات', 'إدخالاً'];
